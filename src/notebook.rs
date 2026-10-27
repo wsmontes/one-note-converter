@@ -236,6 +236,10 @@ fn read_level(folder: &Path, toc: Option<&Path>, depth: usize) -> Notebook {
     };
     for entry in entries {
         if entry.is_section() {
+            if output::safe_toc_name(&entry.name).is_none() {
+                notebook.errors.push(format!("unsafe section name in TOC: {:?}", entry.name));
+                continue;
+            }
             let file = folder.join(&entry.name);
             if !file.is_file() {
                 notebook
@@ -254,6 +258,14 @@ fn read_level(folder: &Path, toc: Option<&Path>, depth: usize) -> Notebook {
         } else {
             entry.name.trim_end_matches(".one").to_string()
         };
+        if output::safe_toc_name(&name).is_none() {
+            notebook.errors.push(format!("unsafe group name in TOC: {name:?}"));
+            continue;
+        }
+        if output::safe_toc_name(&name).is_none() {
+            stats.failures.push(format!("unsafe group name in TOC: {name:?}"));
+            continue;
+        }
         let source = folder.join(&name);
         if !source.is_dir() {
             notebook
@@ -287,6 +299,7 @@ pub struct SectionReport {
     pub pages: usize,
     pub assets: usize,
     pub failures: Vec<String>,
+    pub warnings: Vec<String>,
 }
 
 /// Result of writing a notebook tree.
@@ -295,6 +308,7 @@ pub struct TreeStats {
     pub converted: usize,
     pub sections: Vec<SectionReport>,
     pub failures: Vec<String>,
+    pub warnings: Vec<String>,
 }
 
 /// Write a notebook tree: one `.md` per section, `<section>_assets` for its
@@ -327,6 +341,7 @@ fn write_level(
     let mut converted = 0usize;
     let mut index = String::new();
     let mut handled: Vec<PathBuf> = Vec::new();
+    let mut written_sections = HashSet::new();
 
     let toc = match toc {
         Some(path) => Some(path.to_path_buf()),
@@ -351,7 +366,15 @@ fn write_level(
 
     for entry in &entries {
         if entry.is_section() {
+            if output::safe_toc_name(&entry.name).is_none() {
+                stats.failures.push(format!("unsafe section name in TOC: {:?}", entry.name));
+                continue;
+            }
             let stem = entry.name.trim_end_matches(".one");
+            if !written_sections.insert(stem.to_lowercase()) {
+                stats.failures.push(format!("duplicate output section name: {stem:?}"));
+                continue;
+            }
             index.push_str(&format!(
                 "- [{stem}]({})\n",
                 output::escape_link(&format!("{stem}.md"))
@@ -371,6 +394,7 @@ fn write_level(
             {
                 Ok(written) => {
                     converted += 1;
+                    stats.warnings.extend(written.warnings.iter().map(|warning| format!("{}: {warning}", input.display())));
                     stats.failures.extend(
                         written
                             .failures
@@ -382,6 +406,7 @@ fn write_level(
                         pages: written.pages,
                         assets: written.assets,
                         failures: written.failures,
+                        warnings: written.warnings,
                     });
                 }
                 Err(error) => stats.failures.push(format!("{}: {error}", input.display())),
