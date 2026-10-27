@@ -3,22 +3,21 @@
 Three registries are fed from one tag. Everything below is one-time setup except
 the version bump and the tag.
 
-> **Status (v0.1.0):** GitHub Actions cannot start on this account — every job
-> exits with *"The job was not started because your account is locked due to a
-> billing issue."* Fix it in **Settings → Billing** (the annotation is emitted
-> before any step, so no workflow change helps), then re-run the workflow with
-> `gh run rerun <id>`. Meanwhile use `./scripts/check.sh`, which runs exactly
-> the CI commands in order (and works without a pre-existing virtualenv). Runner labels are pinned (`ubuntu-24.04`, `macos-15`,
-> `macos-15-intel`, `windows-2025`) so migrations do not change the matrix.
-> The workflows are **disabled** (`gh workflow disable CI`) so pushes do not
-> queue runs that can only fail; re-enable with `gh workflow enable CI` once the
-> account is unlocked, then re-run the existing run instead of triggering a new
-> one. Build outputs (`dist/`) are gitignored — the release assets are the
-> distributable artifacts. Until that is resolved, CI does not run and neither does
-> trusted publishing (OIDC) to PyPI. The working distribution path today is
-> Homebrew (tap + local build) and the artifacts attached to the GitHub release.
-> The two local upload commands at the end of sections 2 and 3 are the
-> alternatives.
+> **Status (v0.1.1):** the account billing lock is gone and the pipelines run.
+> CI is green on `ubuntu-24.04`, `macos-15` and `windows-2025` (Rust) plus
+> `Python 3.9`/`3.13`; the `v0.1.1` release built five wheels (manylinux
+> x86_64/aarch64, macOS arm64/x86_64, Windows amd64) and the sdist, and attached
+> them to the GitHub release. The Homebrew tap auto-bumped to `0.1.1` through its
+> own workflow, and its daily schedule is back on.
+>
+> Left: publishing to the registries. PyPI needs a pending trusted publisher on
+> <https://pypi.org/manage/account/publishing/> (project `onenote-converter`,
+> owner `wsmontes`, repository `one-note-converter`, workflow `release.yml`,
+> environment `pypi`) and then the repository variable `PYPI_PUBLISH=true`;
+> crates.io needs the `CARGO_REGISTRY_TOKEN` secret. Both environments already
+> exist, so only those two settings are missing. Until they are set the publish
+> jobs are skipped and a tag run stays green. Build outputs (`dist/`) are
+> gitignored — release assets are the distributables.
 
 ## 1. Version bump
 
