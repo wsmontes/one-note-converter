@@ -330,37 +330,17 @@ pub fn unique_name(filename: &str, written: &mut BTreeSet<String>) -> String {
 }
 
 fn percent_encode(name: &str) -> String {
-    let mut escaped = String::new();
-    for byte in name.bytes() {
-        match byte {
-            b' ' | b'(' | b')' | b'%' | b'#' | b'?' | b'<' | b'>' | b'[' | b']'
-            | b'\\' | b'&' | b'\'' | b'"' | b'\n' | b'\r' => {
-                escaped.push_str(&format!("%{byte:02X}"));
-            }
-            // Leave Unicode UTF-8 untouched for readable, portable links.
-            _ => escaped.push(byte as char),
-        }
-    }
-    // Reconstitute UTF-8: percent-encoded bytes are ASCII; unescaped bytes
-    // should stay as valid UTF-8, rather than mojibake.
-    if name.is_ascii() {
-        return escaped;
-    }
-    let mut result = String::new();
-    for ch in name.chars() {
-        if ch.is_ascii() {
-            let b = ch as u8;
-            if matches!(b, b' ' | b'(' | b')' | b'%' | b'#' | b'?' | b'<' | b'>'
-                | b'[' | b']' | b'\\' | b'&' | b'\'' | b'"' | b'\n' | b'\r') {
-                result.push_str(&format!("%{b:02X}"));
-            } else {
-                result.push(ch);
-            }
+    let mut out = String::with_capacity(name.len());
+    for c in name.chars() {
+        if matches!(c, ' ' | '(' | ')' | '%' | '#' | '?' | '<' | '>' | '['
+                    | ']' | '\\' | '&' | '\'' | '"' | '\n' | '\r') {
+            out.push_str(&format!("%{:02X}", c as u32));
         } else {
-            result.push(ch);
+            // Preserve readable Unicode; escape only URI/Markdown delimiters.
+            out.push(c);
         }
     }
-    result
+    out
 }
 
 pub fn escape_link(name: &str) -> String {
@@ -480,7 +460,7 @@ pub fn package_path(name: &str) -> Option<PathBuf> {
 /// Validate before using it for either reading or writing.
 pub fn safe_toc_name(name: &str) -> Option<&str> {
     if name.is_empty() || name == "." || name == ".." || name.ends_with('.')
-        || name.ends_with(' ') || name.contains(['/', '\\', ':'])
+        || name.ends_with(' ') || name.chars().any(|c| matches!(c, '/' | '\\' | ':'))
         || name.chars().any(|c| c.is_control() || "<>\"|?*".contains(c))
     {
         None
