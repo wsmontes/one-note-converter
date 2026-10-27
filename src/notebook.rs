@@ -513,6 +513,7 @@ pub fn write_unindexed(
     fn visit(
         source: &Path, current: &Path, out: &Path, front_matter: bool,
         split_pages: bool, depth: usize, stats: &mut TreeStats,
+        seen_outputs: &mut HashSet<String>,
     ) -> Result<(), String> {
         if depth > 32 {
             stats.failures.push(format!("package nesting exceeds 32 levels: {}", current.display()));
@@ -531,7 +532,7 @@ pub fn write_unindexed(
                 continue;
             }
             if ty.is_dir() {
-                visit(source, &path, out, front_matter, split_pages, depth + 1, stats)?;
+                visit(source, &path, out, front_matter, split_pages, depth + 1, stats, seen_outputs)?;
                 continue;
             }
             if !ty.is_file() || path.extension().is_none_or(|ext| ext != "one") {
@@ -545,6 +546,11 @@ pub fn write_unindexed(
                 continue;
             }
             let target = out.join(relative).join(&stem);
+            let unique_key = target.to_string_lossy().to_lowercase();
+            if !seen_outputs.insert(unique_key) {
+                stats.failures.push(format!("colliding section output: {}", target.display()));
+                continue;
+            }
             let bytes = std::fs::read(&path)
                 .map_err(|error| format!("{}: {error}", path.display()))?;
             let result = Section::read(bytes).and_then(|section| {
@@ -572,7 +578,7 @@ pub fn write_unindexed(
         }
         Ok(())
     }
-    visit(source, source, out, front_matter, split_pages, 0, &mut stats)?;
+    visit(source, source, out, front_matter, split_pages, 0, &mut stats, &mut HashSet::new())?;
     if stats.converted == 0 && stats.failures.is_empty() {
         return Err("package contains no sections".into());
     }
