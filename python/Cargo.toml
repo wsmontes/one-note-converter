@@ -22,5 +22,5 @@ default = []
 extension-module = ["pyo3/extension-module"]
 
 [dependencies]
-pyo3 = { version = "0.23", features = ["abi3-py38"] }
+pyo3 = { version = "0.23", features = ["abi3-py39"] }
 one-note-converter = { path = "..", version = "0.1.0" }

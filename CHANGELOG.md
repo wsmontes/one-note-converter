@@ -31,7 +31,7 @@ First release: a CLI, a Rust library and Python bindings over one parser.
   the storage index are translated into the same object model as plain stores.
 - **Python bindings** (`onenote`): `read_section`, `read_notebook`,
   `read_package` with `Section`/`Page`/`Image`/`Notebook`/`Package`, abi3 wheels
-  for CPython 3.8+.
+  for CPython 3.9+.
 - **Machine-readable runs**: `--report` writes a JSON summary, `--strict` turns
   any warning into a non-zero exit status.
 
