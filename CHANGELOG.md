@@ -6,6 +6,25 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-27
+
+Packaging and verification release; no parser behaviour changed.
+
+### Fixed
+
+- CI could not build the Python extension: `maturin develop` needs a virtualenv,
+  so the workflow now builds a wheel and installs it (the same commands
+  `scripts/check.sh` runs).
+- The sdist no longer carries `.gitignore` or `PLAN.md`.
+
+### Changed
+
+- Python floor is `>= 3.9` everywhere (the abi3 feature matched it).
+- Runner labels are pinned (`ubuntu-24.04`, `macos-15`, `macos-15-intel`,
+  `windows-2025`) so label migrations cannot change the matrix.
+- `scripts/check.sh` reproduces the CI gate, including creating a throwaway
+  virtualenv on a bare checkout and installing the built sdist into a clean one.
+
 ## [0.1.0] - 2026-10-26
 
 First release: a CLI, a Rust library and Python bindings over one parser.
@@ -40,5 +59,6 @@ First release: a CLI, a Rust library and Python bindings over one parser.
 - Encrypted sections are detected and reported; their content is not decrypted.
 - Format decisions and the measurements behind them are recorded in `PLAN.md`.
 
-[Unreleased]: https://github.com/wsmontes/one-note-converter/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/wsmontes/one-note-converter/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/wsmontes/one-note-converter/releases/tag/v0.1.1
 [0.1.0]: https://github.com/wsmontes/one-note-converter/releases/tag/v0.1.0
