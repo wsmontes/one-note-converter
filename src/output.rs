@@ -430,8 +430,11 @@ pub fn relative_link_prefix(base: &Path, assets: &Path) -> String {
 /// index, so it never counts.
 pub fn find_toc(folder: &Path) -> Option<PathBuf> {
     let mut candidates = root_level(folder, "onetoc2");
-    candidates.retain(|path| !path.file_stem()
-        .is_some_and(|stem| stem.to_string_lossy().starts_with('.')));
+    candidates.retain(|path| {
+        !path
+            .file_stem()
+            .is_some_and(|stem| stem.to_string_lossy().starts_with('.'))
+    });
     candidates.into_iter().next()
 }
 
