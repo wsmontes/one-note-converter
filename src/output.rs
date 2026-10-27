@@ -183,6 +183,41 @@ impl Section {
         ))
     }
 
+    /// Export each page as a standalone Markdown document, with its own valid
+    /// YAML front matter. Assets are shared by pages inside this section.
+    /// The result includes an index.md in the requested output directory.
+    pub fn write_pages(&self, out: &Path, front_matter: bool) -> Result<SectionStats, String> {
+        std::fs::create_dir_all(out)
+            .map_err(|error| format!("cannot create {}: {error}", out.display()))?;
+        let assets = out.join("assets");
+        let (_, mut stats) = self.materialize(&assets, "assets", front_matter)?;
+        let names = self.image_names();
+        let mut used = BTreeSet::new();
+        let mut index = String::new();
+        for page in &self.pages {
+            let label = format!("{}-{}-{}.md", page.title, page.space_index, page.oid);
+            let filename = unique_name(&label, &mut used);
+            let mut resolver = |image: &AssetRef| {
+                image.guid.and_then(|guid| names.get(&guid))
+                    .map(|name| join_link("assets", name))
+                    .unwrap_or_else(|| link_name(image))
+            };
+            let text = markdown::render_with_options(
+                std::slice::from_ref(page), &mut resolver, front_matter
+            );
+            let file = out.join(&filename);
+            std::fs::write(&file, text)
+                .map_err(|error| format!("cannot write {}: {error}", file.display()))?;
+            index.push_str(&format!("- [{}]({})\n",
+                page.title.replace('[', "\\[").replace(']', "\\]"),
+                escape_link(&filename)));
+        }
+        std::fs::write(out.join("index.md"), index)
+            .map_err(|error| format!("cannot write {}/index.md: {error}", out.display()))?;
+        stats.pages = self.pages.len();
+        Ok(stats)
+    }
+
     /// Write `<output>` plus its pictures into `assets`.
     pub fn write(
         &self,
