@@ -1,0 +1,14 @@
+[package]
+name = "one-note-converter"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+description = "Converter for Microsoft OneNote .one section files to Markdown"
+license = "MIT"
+
+[[bin]]
+name = "onenote2md"
+path = "src/main.rs"
+
+[dependencies]
+flate2 = { version = "1", default-features = false, features = ["zlib-rs"] }

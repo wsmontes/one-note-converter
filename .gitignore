@@ -1,0 +1,7 @@
+/target
+/python/target
+/python/.venv
+/python/*.so
+/python/dist
+__pycache__/
+.pytest_cache/

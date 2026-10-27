@@ -1,0 +1,21 @@
+[package]
+name = "onenote-py"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+description = "Python bindings for the OneNote (MS-ONESTORE) reader"
+license = "MIT"
+
+[lib]
+name = "onenote"
+crate-type = ["cdylib"]
+
+[features]
+# Enabled by maturin when building the extension; keeps `cargo test` in this
+# crate linkable against libpython.
+default = []
+extension-module = ["pyo3/extension-module"]
+
+[dependencies]
+pyo3 = { version = "0.23", features = ["abi3-py38"] }
+one-note-converter = { path = ".." }
