@@ -30,6 +30,8 @@ else
     "$VENV/bin/pip" install --quiet --upgrade pip
     "$VENV/bin/pip" install --quiet -r python/requirements-dev.txt
 fi
+# Absolute, so the python/ subshell below cannot mis-resolve it.
+VENV="$(cd "$VENV" && pwd)"
 
 step "cargo fmt"
 cargo fmt --all --check
@@ -41,14 +43,14 @@ step "rust tests (CLI crate, as in CI)"
 cargo test --release -p one-note-converter
 
 step "python extension"
-(cd python && VIRTUAL_ENV="../$VENV" "../$VENV/bin/maturin" develop --release)
+(cd python && VIRTUAL_ENV="$VENV" "$VENV/bin/maturin" develop --release)
 
 step "python tests"
-(cd python && "../$VENV/bin/python" -m pytest tests -q)
+(cd python && "$VENV/bin/python" -m pytest tests -q)
 
 step "packaging: wheel + sdist"
 rm -rf dist
-(cd python && VIRTUAL_ENV="../$VENV" "../$VENV/bin/maturin" build --release --sdist --out ../dist)
+(cd python && VIRTUAL_ENV="$VENV" "$VENV/bin/maturin" build --release --sdist --out ../dist)
 
 step "packaging: metadata check"
 "$VENV/bin/twine" check dist/*
