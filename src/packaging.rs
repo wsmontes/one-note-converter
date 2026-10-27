@@ -302,8 +302,9 @@ fn collect_group<'a>(
                 cells,
                 data,
             } => {
-                out.insert(
-                    (object_id, partition),
+                // Revisions are visited newest first: an older base must never
+                // overwrite the first (current) declaration of an object.
+                out.entry((object_id, partition)).or_insert(
                     ObjectData {
                         data,
                         objects,
