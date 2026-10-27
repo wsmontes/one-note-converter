@@ -413,8 +413,8 @@ impl PyPackage {
     fn write_sections(&self, out: &std::path::Path, front_matter: bool) -> PyResult<PyTreeStats> {
         let mut sections = Vec::new();
         let mut failures = Vec::new();
-        let staging = std::env::temp_dir().join(format!("onenote-py-pkg-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&staging);
+        let scratch = one_note_converter::temp::ScratchDir::new("onenote-py-pkg").map_err(error)?;
+        let staging = scratch.path().to_path_buf();
         let extracted = self.extract_to(staging.clone())?;
         let mut entries: Vec<PathBuf> = extracted
             .into_iter()
@@ -422,7 +422,6 @@ impl PyPackage {
             .collect();
         entries.sort();
         if entries.is_empty() {
-            let _ = std::fs::remove_dir_all(&staging);
             return Err(error(
                 "package contains no sections or table of contents".to_string(),
             ));
@@ -451,7 +450,6 @@ impl PyPackage {
                 failures: stats.failures,
             });
         }
-        let _ = std::fs::remove_dir_all(&staging);
         Ok(PyTreeStats {
             converted: sections.len(),
             sections,
@@ -509,8 +507,8 @@ impl PyPackage {
     /// section on its own.
     #[pyo3(signature = (out, front_matter = false))]
     fn write(&self, out: PathBuf, front_matter: bool) -> PyResult<PyTreeStats> {
-        let staging = std::env::temp_dir().join(format!("onenote-py-pkg-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&staging);
+        let scratch = one_note_converter::temp::ScratchDir::new("onenote-py-pkg").map_err(error)?;
+        let staging = scratch.path().to_path_buf();
         self.extract_to(staging.clone())?;
         let tocs = output::root_level(&staging, "onetoc2");
         let result = if tocs.is_empty() {
@@ -539,14 +537,12 @@ impl PyPackage {
                             .extend(stats.sections.into_iter().map(section_report));
                     }
                     Err(cause) => {
-                        let _ = std::fs::remove_dir_all(&staging);
                         return Err(error(cause));
                     }
                 }
             }
             Ok(combined)
         };
-        let _ = std::fs::remove_dir_all(&staging);
         result
     }
 
