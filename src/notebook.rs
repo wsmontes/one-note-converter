@@ -237,7 +237,9 @@ fn read_level(folder: &Path, toc: Option<&Path>, depth: usize) -> Notebook {
     for entry in entries {
         if entry.is_section() {
             if output::safe_toc_name(&entry.name).is_none() {
-                notebook.errors.push(format!("unsafe section name in TOC: {:?}", entry.name));
+                notebook
+                    .errors
+                    .push(format!("unsafe section name in TOC: {:?}", entry.name));
                 continue;
             }
             let file = folder.join(&entry.name);
@@ -375,7 +377,9 @@ fn write_level(
     for entry in &entries {
         if entry.is_section() {
             if output::safe_toc_name(&entry.name).is_none() {
-                stats.failures.push(format!("unsafe section name in TOC: {:?}", entry.name));
+                stats
+                    .failures
+                    .push(format!("unsafe section name in TOC: {:?}", entry.name));
                 continue;
             }
             let stem = entry.name.trim_end_matches(".one");
@@ -409,7 +413,12 @@ fn write_level(
             {
                 Ok(written) => {
                     converted += 1;
-                    stats.warnings.extend(written.warnings.iter().map(|warning| format!("{}: {warning}", input.display())));
+                    stats.warnings.extend(
+                        written
+                            .warnings
+                            .iter()
+                            .map(|warning| format!("{}: {warning}", input.display())),
+                    );
                     stats.failures.extend(
                         written
                             .failures
@@ -435,7 +444,9 @@ fn write_level(
             entry.name.trim_end_matches(".one").to_string()
         };
         if output::safe_toc_name(&name).is_none() {
-            stats.failures.push(format!("unsafe group name in TOC: {name:?}"));
+            stats
+                .failures
+                .push(format!("unsafe group name in TOC: {name:?}"));
             continue;
         }
         let source = folder.join(&name);
