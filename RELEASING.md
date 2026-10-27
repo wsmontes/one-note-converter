@@ -3,12 +3,12 @@
 Three registries are fed from one tag. Everything below is one-time setup except
 the version bump and the tag.
 
-> **Status (v0.1.1):** the account billing lock is gone and the pipelines run.
+> **Status (v0.1.2):** the account billing lock is gone and the pipelines run.
 > CI is green on `ubuntu-24.04`, `macos-15` and `windows-2025` (Rust) plus
-> `Python 3.9`/`3.13`; the `v0.1.1` release built five wheels (manylinux
-> x86_64/aarch64, macOS arm64/x86_64, Windows amd64) and the sdist, and attached
-> them to the GitHub release. The Homebrew tap auto-bumped to `0.1.1` through its
-> own workflow, and its daily schedule is back on.
+> `Python 3.9`/`3.13`; `v0.1.2` built five wheels (manylinux x86_64/aarch64,
+> macOS arm64/x86_64, Windows amd64) and the sdist — each wheel carrying the
+> licence text — and attached them to the GitHub release. The Homebrew tap
+> auto-bumped to `0.1.2` through its own workflow, and its daily schedule is on.
 >
 > Left: publishing to the registries. PyPI needs a pending trusted publisher on
 > <https://pypi.org/manage/account/publishing/> (project `onenote-converter`,
@@ -26,6 +26,7 @@ The version lives in one place: `[workspace.package] version` in `Cargo.toml`.
 
 ```sh
 # edit Cargo.toml → version = "0.2.0"
+# update the artifact URL shown in README "Install" to the new tag
 cargo test --workspace --release
 cd python && maturin develop --release && python -m pytest tests -q
 ```
