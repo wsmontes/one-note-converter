@@ -15,11 +15,10 @@ the version bump and the tag.
 > (<https://crates.io/crates/one-note-converter>) and Homebrew
 > (`brew install wsmontes/onenote/onenote2md`).
 >
-> Publishes from CI: PyPI runs automatically on every tag because
-> `PYPI_PUBLISH=true`. crates.io still needs the `CARGO_REGISTRY_TOKEN` secret —
-> it is **not** set, so v0.1.2 was published once from a workstation with
-> `cargo publish -p one-note-converter --locked` after `cargo login`. Set the
-> secret (with a token you did not paste anywhere else) to make tags publish too.
+> Publishes from CI: both registries now run on every tag — PyPI through OIDC
+> (`PYPI_PUBLISH=true`) and crates.io through the `CARGO_REGISTRY_TOKEN` secret
+> (set; the token answers `cargo owner --list one-note-converter`). v0.1.2 itself
+> was published from a workstation, because it predates the secret.
 >
 > Two rules that bite:
 >
