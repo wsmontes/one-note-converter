@@ -10,14 +10,19 @@ the version bump and the tag.
 > licence text — and attached them to the GitHub release. The Homebrew tap
 > auto-bumped to `0.1.2` through its own workflow, and its daily schedule is on.
 >
-> Left: publishing to the registries. PyPI needs a pending trusted publisher on
+> **PyPI is live.** `pip install onenote-converter` resolves 0.1.2 from the
+> index; the trusted publisher is registered on
 > <https://pypi.org/manage/account/publishing/> (project `onenote-converter`,
 > owner `wsmontes`, repository `one-note-converter`, workflow `release.yml`,
-> environment `pypi`) and then the repository variable `PYPI_PUBLISH=true`;
-> crates.io needs the `CARGO_REGISTRY_TOKEN` secret. Both environments already
-> exist, so only those two settings are missing. Until they are set the publish
-> jobs are skipped and a tag run stays green. Build outputs (`dist/`) are
-> gitignored — release assets are the distributables.
+> environment `pypi`) and the repository variable `PYPI_PUBLISH=true` is set.
+> The workflow name and environment must match those exact values — a pending
+> publisher saved with another workflow filename fails as `invalid-publisher`.
+>
+> Left: crates.io. It needs the `CARGO_REGISTRY_TOKEN` secret (or a local
+> `cargo publish -p one-note-converter --locked`); until it exists the job is
+> skipped and a tag run stays green. Remember that a PyPI/crates.io version
+> cannot be re-uploaded, so every release needs a version bump. Build outputs
+> (`dist/`) are gitignored — release assets are the distributables.
 
 ## 1. Version bump
 
