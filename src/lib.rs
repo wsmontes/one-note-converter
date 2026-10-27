@@ -27,6 +27,7 @@ pub mod packaging;
 pub mod prop;
 pub mod reader;
 pub mod store;
+pub mod temp;
 
 use header::Header;
 use reader::ParseResult;

@@ -63,6 +63,11 @@ cargo build --release
 # Markdown to stdout, or to a file with pictures extracted next to it
 ./target/release/onenote2md convert Section.one -o Notes.md
 ./target/release/onenote2md convert Section.one -o out/Notes.md --assets out/images
+# Preserve page-level YAML metadata by writing one Markdown file per page.
+# With --split-pages, -o names a DIRECTORY containing index.md and assets/.
+./target/release/onenote2md convert Section.one --split-pages --front-matter -o out/pages
+./target/release/onenote2md notebook "Open Notebook.onetoc2" --split-pages --front-matter -o out/notebook-pages
+
 
 # a whole notebook: every section listed in the table of contents
 ./target/release/onenote2md notebook "Open Notebook.onetoc2" -o out/notebook
@@ -78,8 +83,10 @@ subfolder with its own `.onetoc2`, so groups become subfolders with their own in
 the table of contents lists but the folder does not contain is reported and makes the command exit
 non-zero, so a batch run cannot mistake a partial notebook for a complete one.
 
-`--front-matter` puts `title`, `created`, `modified`, `authors` and `level` in YAML above each
-page, in `convert`, `notebook` and `onepkg` alike. Dates come from the page node's own `LastModifiedTime` and the file's creation stamps, so a
+`--front-matter` emits YAML metadata for each page. In the default single-file-per-section
+layout, YAML for subsequent pages is not recognized as file-level front matter by most Markdown
+processors. Use `--split-pages` to produce one Markdown document per page (plus `index.md`),
+with valid YAML for each page, in `convert`, `notebook` and `onepkg` alike. Dates come from the page node's own `LastModifiedTime` and the file's creation stamps, so a
 page that never recorded one simply omits the key. `--report` writes a JSON summary
 (`files[].{path,kind,pages,assets,failures,warnings}` plus `totals`), and `--strict` exits non-zero
 when that summary holds any warning — packaged stores report their experimental status that way.
@@ -101,6 +108,7 @@ section = onenote.read_section("Section.one")
 section.pages[0].title
 section.markdown(front_matter=True)
 section.write("out/Section.md", "out/img")
+section.write_pages("out/pages", front_matter=True)  # one file per page
 
 notebook = onenote.read_notebook("Open Notebook.onetoc2")
 notebook.all_sections()
@@ -183,12 +191,10 @@ attachments), **0** objects skipped, **0** partially decoded property sets, **0*
 set padding, and no panics. The only dangling object reference in the corpus is inside a deliberately
 corrupted Tika fuzz fixture.
 
-The two revision-store files that do not convert are the `.onetoc2` table of contents (wrong file
-type for a section) and that corrupted fuzz fixture. The 26 remaining files carry the
-`{638DE92F-A6D4-4BC1-9A36-B3FC2511A5B7}` package store: the same object model, wrapped in
-[MS-FSSHTTPB] data elements (the layout OneNote for Windows and OneDrive produce, and what Joplin
-writes). Supporting them means implementing that wrapper, which is the largest remaining piece of
-work.
+Those baseline figures were gathered before FSSHTTPB support was implemented. The current parser
+also recognizes packaged stores, but this path remains experimental: page bodies may be incomplete.
+The original standalone TOC and deliberately corrupted test fixture are not convertible sections.
+Additional independent end-to-end fixtures are needed to measure current packaged-store fidelity.
 
 ## Verified against
 
@@ -224,7 +230,8 @@ converter renders the current revision and does not merge divergent edits.
   reports it as a warning.
 - Encrypted sections are detected and reported; their content is not decrypted.
 - Pictures that a file references without a payload (web clippings, external caches) are named in the
-  Markdown and listed by `missing_images()`; there are no bytes to write.
+  Markdown, listed by `missing_images()`, and counted as warnings in conversion statistics and
+  `--report` (and errors under `--strict`); there are no bytes to write.
 - Quantum and LZX cabinet compression is rejected; stored and MSZIP folders are read.
 
 ## Provenance and license

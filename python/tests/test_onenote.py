@@ -213,3 +213,35 @@ def test_package_with_table_of_contents_becomes_a_tree(tmp_path: Path) -> None:
     assert stats.converted >= 2
     assert (out / "Open Notebook" / "index.md").is_file()
     assert (out / "Open Notebook" / "Nova Seção 1.md").is_file()
+
+def test_split_page_export_has_one_yaml_header_per_file(tmp_path: Path) -> None:
+    section = onenote.read_section(section_file())
+    result = section.write_pages(tmp_path / "pages", front_matter=True)
+    assert result.pages == section.page_count
+    assert hasattr(result, "warnings")
+    pages = [p for p in (tmp_path / "pages").glob("*.md") if p.name != "index.md"]
+    assert len(pages) == result.pages
+    for page in pages:
+        text = page.read_text(encoding="utf-8")
+        assert text.startswith("---\ntitle: ")
+        assert text.count("---\n") == 2
+
+
+def test_nested_unindexed_package_keeps_folder_in_python(tmp_path: Path) -> None:
+    path = tmp_path / "nested.onepkg"
+    path.write_bytes(cabinet([("Folder/Section.one", section_file().read_bytes())]))
+    package = onenote.read_package(path)
+    stats = package.write(tmp_path / "out")
+    assert stats.converted == 1
+    assert stats.failures == []
+    assert hasattr(stats, "warnings")
+    assert (tmp_path / "out/Folder/Section/Section.md").is_file()
+
+
+def test_cabinet_path_traversal_is_rejected(tmp_path: Path) -> None:
+    path = tmp_path / "evil.onepkg"
+    path.write_bytes(cabinet([("../outside.one", section_file().read_bytes())]))
+    package = onenote.read_package(path)
+    with pytest.raises(ValueError, match="unsafe path"):
+        package.extract_to(tmp_path / "extract")
+    assert not (tmp_path / "outside.one").exists()

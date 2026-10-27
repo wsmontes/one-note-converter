@@ -302,15 +302,14 @@ fn collect_group<'a>(
                 cells,
                 data,
             } => {
-                out.insert(
-                    (object_id, partition),
-                    ObjectData {
-                        data,
-                        objects,
-                        cells,
-                        blob: None,
-                    },
-                );
+                // Revisions are visited newest first: an older base must never
+                // overwrite the first (current) declaration of an object.
+                out.entry((object_id, partition)).or_insert(ObjectData {
+                    data,
+                    objects,
+                    cells,
+                    blob: None,
+                });
             }
             GroupObject::BlobReference {
                 objects,
@@ -410,4 +409,35 @@ fn sniff_extension(bytes: &[u8]) -> String {
         return String::new();
     };
     format!(".{extension}")
+}
+
+#[cfg(test)]
+mod regression_tests {
+    use super::*;
+
+    #[test]
+    fn older_revision_does_not_overwrite_current_object() {
+        let id = ExGuid::default();
+        let declaration = ElementDeclaration::Object {
+            object_id: id,
+            partition_id: PARTITION_OBJECT_DATA,
+            data_size: 1,
+            object_refs: 0,
+            cell_refs: 0,
+        };
+        let mk = |value: u8| fsshttpb::ObjectGroup {
+            declarations: vec![declaration.clone()],
+            objects: vec![GroupObject::Data {
+                objects: vec![],
+                cells: vec![],
+                data: vec![value],
+            }],
+        };
+        let current = mk(23);
+        let previous = mk(42);
+        let mut declarations = HashMap::new();
+        collect_group(&current, &mut declarations);
+        collect_group(&previous, &mut declarations);
+        assert_eq!(declarations[&(id, PARTITION_OBJECT_DATA)].data, &[23]);
+    }
 }

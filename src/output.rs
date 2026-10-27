@@ -26,6 +26,8 @@ pub struct SectionStats {
     pub assets: usize,
     /// Pictures that could not be written (link target, then the OS error).
     pub failures: Vec<String>,
+    /// Missing payloads and parser or format limitations.
+    pub warnings: Vec<String>,
 }
 
 /// A parsed section file (`.one`), with its pages and embedded data.
@@ -137,8 +139,20 @@ impl Section {
         prefix: &str,
         front_matter: bool,
     ) -> Result<(String, SectionStats), String> {
-        let (names, images, _) = self.named_images();
+        let (names, images, missing) = self.named_images();
         let mut failures: Vec<String> = Vec::new();
+        let mut warnings = self.store.warnings.clone();
+        for name in missing {
+            warnings.push(format!("asset {name:?} has no embedded payload"));
+        }
+        if front_matter && self.pages.len() > 1 {
+            warnings.push("combined section has multiple YAML headers; use --split-pages to preserve each page's metadata".into());
+        }
+        if self.store.header.kind() == crate::header::ContainerKind::PackageStore {
+            warnings.push(
+                "[MS-FSSHTTPB] support is experimental; page bodies may be incomplete".into(),
+            );
+        }
         let mut assets_written = 0usize;
         for image in &images {
             let path = assets.join(&image.filename);
@@ -169,8 +183,50 @@ impl Section {
                 pages: self.pages.len(),
                 assets: assets_written,
                 failures,
+                warnings,
             },
         ))
+    }
+
+    /// Export each page as a standalone Markdown document, with its own valid
+    /// YAML front matter. Assets are shared by pages inside this section.
+    /// The result includes an index.md in the requested output directory.
+    pub fn write_pages(&self, out: &Path, front_matter: bool) -> Result<SectionStats, String> {
+        std::fs::create_dir_all(out)
+            .map_err(|error| format!("cannot create {}: {error}", out.display()))?;
+        let assets = out.join("assets");
+        let (_, mut stats) = self.materialize(&assets, "assets", front_matter)?;
+        let names = self.image_names();
+        let mut used = BTreeSet::new();
+        let mut index = String::new();
+        for page in &self.pages {
+            let label = format!("{}-{}-{}.md", page.title, page.space_index, page.oid);
+            let filename = unique_name(&label, &mut used);
+            let mut resolver = |image: &AssetRef| {
+                image
+                    .guid
+                    .and_then(|guid| names.get(&guid))
+                    .map(|name| join_link("assets", name))
+                    .unwrap_or_else(|| link_name(image))
+            };
+            let text = markdown::render_with_options(
+                std::slice::from_ref(page),
+                &mut resolver,
+                front_matter,
+            );
+            let file = out.join(&filename);
+            std::fs::write(&file, text)
+                .map_err(|error| format!("cannot write {}: {error}", file.display()))?;
+            index.push_str(&format!(
+                "- [{}]({})\n",
+                page.title.replace('[', "\\[").replace(']', "\\]"),
+                escape_link(&filename)
+            ));
+        }
+        std::fs::write(out.join("index.md"), index)
+            .map_err(|error| format!("cannot write {}/index.md: {error}", out.display()))?;
+        stats.pages = self.pages.len();
+        Ok(stats)
     }
 
     /// Write `<output>` plus its pictures into `assets`.
@@ -263,15 +319,27 @@ pub fn unique_name(filename: &str, written: &mut BTreeSet<String>) -> String {
         .next()
         .unwrap_or("image")
         .chars()
-        .map(|c| if c.is_control() { '_' } else { c })
+        .map(|c| {
+            if c.is_control() || "<>:\"|?*".contains(c) {
+                '_'
+            } else {
+                c
+            }
+        })
         .collect();
-    let mut candidate = sanitized;
+    let sanitized = sanitized.trim_end_matches(['.', ' ']);
+    let sanitized = if sanitized.is_empty() || sanitized == "." || sanitized == ".." {
+        "image"
+    } else {
+        sanitized
+    };
+    let (stem, extension) = match sanitized.rsplit_once('.') {
+        Some((stem, ext)) if !stem.is_empty() => (stem.to_string(), format!(".{ext}")),
+        _ => (sanitized.to_string(), String::new()),
+    };
+    let mut candidate = sanitized.to_string();
     let mut counter = 2;
     while !written.insert(candidate.clone()) {
-        let (stem, extension) = match candidate.rsplit_once('.') {
-            Some((stem, extension)) => (stem.to_string(), format!(".{extension}")),
-            None => (candidate.clone(), String::new()),
-        };
         candidate = format!("{stem}-{counter}{extension}");
         counter += 1;
     }
@@ -279,14 +347,33 @@ pub fn unique_name(filename: &str, written: &mut BTreeSet<String>) -> String {
 }
 
 fn percent_encode(name: &str) -> String {
-    name.chars()
-        .map(|c| match c {
-            ' ' => "%20".to_string(),
-            '(' => "%28".to_string(),
-            ')' => "%29".to_string(),
-            other => other.to_string(),
-        })
-        .collect()
+    let mut out = String::with_capacity(name.len());
+    for c in name.chars() {
+        if matches!(
+            c,
+            ' ' | '('
+                | ')'
+                | '%'
+                | '#'
+                | '?'
+                | '<'
+                | '>'
+                | '['
+                | ']'
+                | '\\'
+                | '&'
+                | '\''
+                | '"'
+                | '\n'
+                | '\r'
+        ) {
+            out.push_str(&format!("%{:02X}", c as u32));
+        } else {
+            // Preserve readable Unicode; escape only URI/Markdown delimiters.
+            out.push(c);
+        }
+    }
+    out
 }
 
 pub fn escape_link(name: &str) -> String {
@@ -304,19 +391,37 @@ pub fn join_link(prefix: &str, name: &str) -> String {
 
 /// Link prefix that turns `assets` into a path relative to `base`.
 pub fn relative_link_prefix(base: &Path, assets: &Path) -> String {
-    let normalize = |path: &Path| -> PathBuf {
-        std::path::absolute(path).unwrap_or_else(|_| path.to_path_buf())
+    use std::path::Component;
+    let clean = |path: &Path| -> PathBuf {
+        let absolute = std::path::absolute(path).unwrap_or_else(|_| path.to_path_buf());
+        let mut result = PathBuf::new();
+        for component in absolute.components() {
+            match component {
+                Component::CurDir => {}
+                Component::ParentDir => {
+                    result.pop();
+                }
+                other => result.push(other.as_os_str()),
+            }
+        }
+        result
     };
-    let base = normalize(base);
-    let assets = normalize(assets);
-    match assets.strip_prefix(&base) {
-        Ok(relative) => relative
-            .components()
-            .map(|c| c.as_os_str().to_string_lossy().to_string())
-            .collect::<Vec<_>>()
-            .join("/"),
-        Err(_) => assets.to_string_lossy().to_string(),
+    let base = clean(base);
+    let assets = clean(assets);
+    let from: Vec<_> = base.components().collect();
+    let to: Vec<_> = assets.components().collect();
+    let common = from.iter().zip(&to).take_while(|(a, b)| a == b).count();
+    // Different volume roots (e.g. Windows drives) have no portable relative link.
+    if common == 0 {
+        return assets.to_string_lossy().replace('\\', "/");
     }
+    let mut parts = vec!["..".to_string(); from.len() - common];
+    parts.extend(
+        to[common..]
+            .iter()
+            .map(|part| part.as_os_str().to_string_lossy().to_string()),
+    );
+    parts.join("/")
 }
 
 /// The `<name>.onetoc2` that describes a folder's notebook.
@@ -324,22 +429,13 @@ pub fn relative_link_prefix(base: &Path, assets: &Path) -> String {
 /// A dotfile `.onetoc2` is the OneNote Recycle Bin sentinel, not a notebook
 /// index, so it never counts.
 pub fn find_toc(folder: &Path) -> Option<PathBuf> {
-    let entries = std::fs::read_dir(folder).ok()?;
-    for entry in entries.flatten() {
-        let path = entry.path();
-        let is_toc = path
-            .extension()
-            .map(|ext| ext == "onetoc2")
-            .unwrap_or(false);
-        let hidden = path
+    let mut candidates = root_level(folder, "onetoc2");
+    candidates.retain(|path| {
+        !path
             .file_stem()
-            .map(|stem| stem.to_string_lossy().starts_with('.'))
-            .unwrap_or(false);
-        if is_toc && !hidden {
-            return Some(path);
-        }
-    }
-    None
+            .is_some_and(|stem| stem.to_string_lossy().starts_with('.'))
+    });
+    candidates.into_iter().next()
 }
 
 /// Subdirectories that carry their own table of contents (section groups).
@@ -374,17 +470,155 @@ pub fn root_level(dir: &Path, extension: &str) -> Vec<PathBuf> {
 /// Reject absolute paths and `..` components coming from a package.
 pub fn package_path(name: &str) -> Option<PathBuf> {
     let normalised = name.replace('\\', "/");
+    if normalised.starts_with('/') || normalised.chars().any(|c| c.is_control()) {
+        return None;
+    }
     let mut path = PathBuf::new();
     for part in normalised.split('/') {
-        match part {
-            "" | "." => continue,
-            ".." => return None,
-            other => path.push(other),
+        if part == ".." || part.contains(':') {
+            return None;
         }
+        if part.is_empty() || part == "." {
+            continue;
+        }
+        path.push(part);
     }
-    if path.as_os_str().is_empty() {
+    (!path.as_os_str().is_empty()).then_some(path)
+}
+
+/// A TOC element is a file or folder name, never a path.
+/// Validate before using it for either reading or writing.
+pub fn safe_toc_name(name: &str) -> Option<&str> {
+    if name.is_empty()
+        || name == "."
+        || name == ".."
+        || name.ends_with('.')
+        || name.ends_with(' ')
+        || name.chars().any(|c| matches!(c, '/' | '\\' | ':'))
+        || name
+            .chars()
+            .any(|c| c.is_control() || "<>\"|?*".contains(c))
+    {
         None
     } else {
-        Some(path)
+        Some(name)
+    }
+}
+
+#[cfg(test)]
+mod safety_tests {
+    use super::*;
+
+    fn fixture_store() -> store::Store {
+        store::Store::parse(include_bytes!("../tests/fixtures/testOneNote2016.one")).unwrap()
+    }
+
+    #[test]
+    fn rejects_unsafe_package_and_toc_names() {
+        for name in [
+            "/etc/secret.one",
+            "../secret.one",
+            "a/../secret.one",
+            "C:\\temp\\secret.one",
+            "sub/../../secret.one",
+        ] {
+            assert!(package_path(name).is_none(), "{name}");
+        }
+        assert_eq!(
+            package_path("notes/Section.one"),
+            Some(PathBuf::from("notes/Section.one"))
+        );
+        for name in [
+            "../escape.one",
+            "/absolute.one",
+            "C:\\escape.one",
+            "sub/section.one",
+            "..",
+            "bad?.one",
+        ] {
+            assert!(safe_toc_name(name).is_none(), "{name}");
+        }
+        assert_eq!(safe_toc_name("Nova Seção 1.one"), Some("Nova Seção 1.one"));
+    }
+
+    #[test]
+    fn sibling_asset_links_are_relative_and_uri_safe() {
+        let relative = relative_link_prefix(Path::new("export/pages"), Path::new("export/assets"));
+        assert_eq!(relative, "../assets");
+        assert_eq!(
+            join_link(&relative, "A#? 100% (1).png"),
+            "../assets/A%23%3F%20100%25%20%281%29.png"
+        );
+        assert_eq!(escape_link("Nova Seção 1.md"), "Nova%20Seção%201.md");
+    }
+
+    #[test]
+    fn split_pages_has_one_front_matter_per_markdown_file() {
+        let mut a = Page {
+            title: "Page #1".into(),
+            oid: 1,
+            ..Page::default()
+        };
+        a.blocks.push(doc::Block::Paragraph {
+            text: "alpha".into(),
+            level: 0,
+        });
+        let mut b = Page {
+            title: "Page #2".into(),
+            oid: 2,
+            ..Page::default()
+        };
+        b.blocks.push(doc::Block::Paragraph {
+            text: "beta".into(),
+            level: 0,
+        });
+        let section = Section {
+            data: Vec::new(),
+            store: fixture_store(),
+            pages: vec![a, b],
+        };
+        let scratch = crate::temp::ScratchDir::new("onenote-pages-test").unwrap();
+        let stats = section.write_pages(scratch.path(), true).unwrap();
+        assert_eq!(stats.pages, 2);
+        let pages: Vec<_> = std::fs::read_dir(scratch.path())
+            .unwrap()
+            .filter_map(Result::ok)
+            .map(|entry| entry.path())
+            .filter(|path| {
+                path.extension().is_some_and(|ext| ext == "md")
+                    && path.file_name().is_some_and(|name| name != "index.md")
+            })
+            .collect();
+        assert_eq!(pages.len(), 2);
+        for file in pages {
+            let text = std::fs::read_to_string(file).unwrap();
+            assert!(text.starts_with("---\ntitle:"));
+            assert_eq!(text.matches("---\n").count(), 2);
+        }
+    }
+
+    #[test]
+    fn missing_payload_is_reported_during_materialization() {
+        let mut page = Page {
+            title: "Pictures".into(),
+            ..Page::default()
+        };
+        page.blocks.push(doc::Block::Image(AssetRef {
+            filename: "not-embedded.png".into(),
+            ..AssetRef::default()
+        }));
+        let section = Section {
+            data: Vec::new(),
+            store: fixture_store(),
+            pages: vec![page],
+        };
+        let scratch = crate::temp::ScratchDir::new("onenote-missing-asset-test").unwrap();
+        let (markdown, stats) = section.materialize(scratch.path(), "", false).unwrap();
+        assert!(markdown.contains("not-embedded.png"));
+        assert!(stats
+            .warnings
+            .iter()
+            .any(|w| w.contains("not-embedded.png")));
+        assert_eq!(stats.assets, 0);
     }
 }

@@ -145,6 +145,8 @@ struct PySectionStats {
     assets: usize,
     #[pyo3(get)]
     failures: Vec<String>,
+    #[pyo3(get)]
+    warnings: Vec<String>,
 }
 
 #[pymethods]
@@ -235,6 +237,19 @@ impl PySection {
             pages: stats.pages,
             assets: stats.assets,
             failures: stats.failures,
+            warnings: stats.warnings,
+        })
+    }
+
+    /// Write each page as a separate Markdown file with valid YAML front matter.
+    #[pyo3(signature = (out, front_matter = false))]
+    fn write_pages(&self, out: PathBuf, front_matter: bool) -> PyResult<PySectionStats> {
+        let stats = self.inner.write_pages(&out, front_matter).map_err(error)?;
+        Ok(PySectionStats {
+            pages: stats.pages,
+            assets: stats.assets,
+            failures: stats.failures,
+            warnings: stats.warnings,
         })
     }
 
@@ -270,6 +285,8 @@ struct PySectionReport {
     assets: usize,
     #[pyo3(get)]
     failures: Vec<String>,
+    #[pyo3(get)]
+    warnings: Vec<String>,
 }
 
 #[pymethods]
@@ -290,6 +307,8 @@ struct PyTreeStats {
     sections: Vec<PySectionReport>,
     #[pyo3(get)]
     failures: Vec<String>,
+    #[pyo3(get)]
+    warnings: Vec<String>,
 }
 
 #[pymethods]
@@ -309,6 +328,7 @@ fn section_report(section: notebook::SectionReport) -> PySectionReport {
         pages: section.pages,
         assets: section.assets,
         failures: section.failures,
+        warnings: section.warnings,
     }
 }
 
@@ -378,17 +398,24 @@ impl PyNotebook {
     }
 
     /// Convert the whole tree: one `.md` per section plus an `index.md` per level.
-    #[pyo3(signature = (out, front_matter = false))]
-    fn write(&self, out: PathBuf, front_matter: bool) -> PyResult<PyTreeStats> {
+    #[pyo3(signature = (out, front_matter = false, split_pages = false))]
+    fn write(&self, out: PathBuf, front_matter: bool, split_pages: bool) -> PyResult<PyTreeStats> {
         let Some(toc) = self.inner.toc.clone() else {
             return Err(error("notebook has no table of contents".to_string()));
         };
-        let stats = notebook::write_tree(&self.inner.folder, &out, front_matter, Some(&toc))
-            .map_err(error)?;
+        let stats = notebook::write_tree_with_options(
+            &self.inner.folder,
+            &out,
+            front_matter,
+            Some(&toc),
+            split_pages,
+        )
+        .map_err(error)?;
         Ok(PyTreeStats {
             converted: stats.converted,
             sections: stats.sections.into_iter().map(section_report).collect(),
             failures: stats.failures,
+            warnings: stats.warnings,
         })
     }
 
@@ -410,52 +437,21 @@ struct PyPackage {
 }
 
 impl PyPackage {
-    fn write_sections(&self, out: &std::path::Path, front_matter: bool) -> PyResult<PyTreeStats> {
-        let mut sections = Vec::new();
-        let mut failures = Vec::new();
-        let staging = std::env::temp_dir().join(format!("onenote-py-pkg-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&staging);
-        let extracted = self.extract_to(staging.clone())?;
-        let mut entries: Vec<PathBuf> = extracted
-            .into_iter()
-            .filter(|path| path.extension().is_some_and(|ext| ext == "one"))
-            .collect();
-        entries.sort();
-        if entries.is_empty() {
-            let _ = std::fs::remove_dir_all(&staging);
-            return Err(error(
-                "package contains no sections or table of contents".to_string(),
-            ));
-        }
-        for entry in entries {
-            let stem = entry
-                .file_stem()
-                .map(|stem| stem.to_string_lossy().to_string())
-                .unwrap_or_else(|| "section".to_string());
-            let section = std::fs::read(&entry)
-                .map_err(|cause| PyOSError::new_err(format!("{}: {cause}", entry.display())))
-                .and_then(|bytes| RustSection::read(bytes).map_err(error))?;
-            let dir = out.join(&stem);
-            let stats = section
-                .write(
-                    &dir.join(format!("{stem}.md")),
-                    &dir.join("assets"),
-                    front_matter,
-                )
-                .map_err(error)?;
-            failures.extend(stats.failures.iter().cloned());
-            sections.push(PySectionReport {
-                input: entry,
-                pages: stats.pages,
-                assets: stats.assets,
-                failures: stats.failures,
-            });
-        }
-        let _ = std::fs::remove_dir_all(&staging);
+    fn write_sections(
+        &self,
+        out: &std::path::Path,
+        front_matter: bool,
+        split_pages: bool,
+    ) -> PyResult<PyTreeStats> {
+        let scratch = one_note_converter::temp::ScratchDir::new("onenote-py-pkg").map_err(error)?;
+        self.extract_to(scratch.path().to_path_buf())?;
+        let stats = notebook::write_unindexed(scratch.path(), out, front_matter, split_pages)
+            .map_err(error)?;
         Ok(PyTreeStats {
-            converted: sections.len(),
-            sections,
-            failures,
+            converted: stats.converted,
+            sections: stats.sections.into_iter().map(section_report).collect(),
+            failures: stats.failures,
+            warnings: stats.warnings,
         })
     }
 }
@@ -507,19 +503,20 @@ impl PyPackage {
 
     /// Convert the package: its notebooks when it carries a TOC, otherwise each
     /// section on its own.
-    #[pyo3(signature = (out, front_matter = false))]
-    fn write(&self, out: PathBuf, front_matter: bool) -> PyResult<PyTreeStats> {
-        let staging = std::env::temp_dir().join(format!("onenote-py-pkg-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&staging);
+    #[pyo3(signature = (out, front_matter = false, split_pages = false))]
+    fn write(&self, out: PathBuf, front_matter: bool, split_pages: bool) -> PyResult<PyTreeStats> {
+        let scratch = one_note_converter::temp::ScratchDir::new("onenote-py-pkg").map_err(error)?;
+        let staging = scratch.path().to_path_buf();
         self.extract_to(staging.clone())?;
         let tocs = output::root_level(&staging, "onetoc2");
         let result = if tocs.is_empty() {
-            self.write_sections(&out, front_matter)
+            self.write_sections(&out, front_matter, split_pages)
         } else {
             let mut combined = PyTreeStats {
                 converted: 0,
                 sections: Vec::new(),
                 failures: Vec::new(),
+                warnings: Vec::new(),
             };
             for toc in tocs {
                 let base = toc
@@ -530,23 +527,28 @@ impl PyPackage {
                     .file_stem()
                     .map(|stem| stem.to_string_lossy().to_string())
                     .unwrap_or_else(|| "notebook".to_string());
-                match notebook::write_tree(&base, &out.join(stem), front_matter, Some(&toc)) {
+                match notebook::write_tree_with_options(
+                    &base,
+                    &out.join(stem),
+                    front_matter,
+                    Some(&toc),
+                    split_pages,
+                ) {
                     Ok(stats) => {
                         combined.converted += stats.converted;
                         combined.failures.extend(stats.failures);
+                        combined.warnings.extend(stats.warnings);
                         combined
                             .sections
                             .extend(stats.sections.into_iter().map(section_report));
                     }
                     Err(cause) => {
-                        let _ = std::fs::remove_dir_all(&staging);
                         return Err(error(cause));
                     }
                 }
             }
             Ok(combined)
         };
-        let _ = std::fs::remove_dir_all(&staging);
         result
     }
 

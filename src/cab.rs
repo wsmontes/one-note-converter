@@ -108,7 +108,9 @@ impl Cabinet {
                     .unwrap(),
             ) as usize;
             let name_at = cursor + 16;
-            let end = data[name_at..]
+            let end = data
+                .get(name_at..)
+                .ok_or("CFFILE name offset exceeds cabinet length")?
                 .iter()
                 .position(|byte| *byte == 0)
                 .ok_or("CFFILE name is not terminated")?;
@@ -186,7 +188,15 @@ fn decompress_folder(data: &[u8], folder: &Folder) -> Result<Vec<u8>, String> {
             .get(start..start + cb_data)
             .ok_or_else(|| format!("CFDATA {block} payload truncated"))?;
         match folder.compression {
-            0 => out.extend_from_slice(raw),
+            0 => {
+                if raw.len() != cb_uncomp {
+                    return Err(format!(
+                        "CFDATA {block}: stored size {} differs from declared {cb_uncomp}",
+                        raw.len()
+                    ));
+                }
+                out.extend_from_slice(raw);
+            }
             1 => {
                 // MSZIP: each block is `CK` followed by a raw deflate stream.
                 let body = raw
@@ -204,16 +214,25 @@ fn decompress_folder(data: &[u8], folder: &Folder) -> Result<Vec<u8>, String> {
                 let mut consumed = 0usize;
                 loop {
                     let before_out = inflater.total_out();
+                    let before_in = inflater.total_in();
                     let mut chunk = vec![0u8; 32 * 1024];
                     let status = inflater
                         .decompress(&body[consumed..], &mut chunk, FlushDecompress::None)
                         .map_err(|error| format!("CFDATA {block}: {error}"))?;
                     let produced = (inflater.total_out() - before_out) as usize;
                     chunk.truncate(produced);
+                    if produced > cb_uncomp.saturating_sub(block_out.len()) {
+                        return Err(format!(
+                            "CFDATA {block}: decompression exceeds declared {cb_uncomp} bytes"
+                        ));
+                    }
                     block_out.extend_from_slice(&chunk);
                     consumed = inflater.total_in() as usize;
                     if status == flate2::Status::StreamEnd {
                         break;
+                    }
+                    if produced == 0 && inflater.total_in() == before_in {
+                        return Err(format!("CFDATA {block}: inflater made no progress"));
                     }
                     if produced == 0 && consumed >= body.len() {
                         // The stream ended without zlib reporting StreamEnd; the
@@ -356,6 +375,14 @@ mod tests {
         let bytes = cabinet.read(0).unwrap();
         assert_eq!(bytes.len(), payload.len());
         assert!(bytes.iter().all(|byte| *byte == b'A'));
+    }
+
+    #[test]
+    fn malformed_file_table_offset_is_an_error_not_a_panic() {
+        let mut bytes = build(&[("a.one", vec![1, 2, 3])], false);
+        let beyond = (bytes.len() + 4) as u32;
+        bytes[16..20].copy_from_slice(&beyond.to_le_bytes());
+        assert!(Cabinet::parse(&bytes).is_err());
     }
 
     #[test]

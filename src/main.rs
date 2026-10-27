@@ -14,7 +14,7 @@ USAGE:
     onenote2md header  <file.one>
     onenote2md inspect <file.one> [--decls] [--object <space>:<oid>]
                                   [--blob <hex>] [--locate <hex>] [--find-text <text>]
-    onenote2md convert <file.one> [-o <out.md>] [--assets <dir>] [--front-matter]
+    onenote2md convert <file.one> [-o <out.md>] [--assets <dir>] [--front-matter] [--split-pages]
     onenote2md notebook <notebook.onetoc2> [-o <dir>] [--report <json>] [--strict]
     onenote2md onepkg   <notebook.onepkg> [-o <dir>] [--report <json>] [--strict]
 
@@ -69,6 +69,8 @@ struct Options<'a> {
     report: Option<&'a str>,
     /// `--strict` turns any warning into a non-zero exit status.
     strict: bool,
+    /// Export individual pages with valid YAML front matter per file.
+    split_pages: bool,
 }
 
 /// One converted file, as recorded in the `--report` summary.
@@ -199,6 +201,10 @@ fn run(args: &[String]) -> Result<(), String> {
             }
             "--strict" => {
                 options.strict = true;
+                rest = &rest[1..];
+            }
+            "--split-pages" => {
+                options.split_pages = true;
                 rest = &rest[1..];
             }
             "--find-jcid" => {
@@ -856,7 +862,14 @@ fn notebook(
                 .unwrap_or_else(|| "notebook".to_string())
         )),
     };
-    notebook_into(&base, root, report, Some(toc_path), options.front_matter)
+    notebook_into(
+        &base,
+        root,
+        report,
+        Some(toc_path),
+        options.front_matter,
+        options.split_pages,
+    )
 }
 
 /// Convert every section reachable from a table of contents into `root`.
@@ -868,11 +881,18 @@ fn notebook_into(
     report: &mut Report,
     toc: Option<&Path>,
     front_matter: bool,
+    split_pages: bool,
 ) -> Result<(), String> {
     std::fs::create_dir_all(&root)
         .map_err(|error| format!("cannot create {}: {error}", root.display()))?;
 
-    let stats = one_note_converter::notebook::write_tree(base, &root, front_matter, toc)?;
+    let stats = one_note_converter::notebook::write_tree_with_options(
+        base,
+        &root,
+        front_matter,
+        toc,
+        split_pages,
+    )?;
     for section in &stats.sections {
         report.add(ReportEntry {
             path: section.input.display().to_string(),
@@ -880,7 +900,7 @@ fn notebook_into(
             pages: section.pages,
             assets: section.assets,
             failures: section.failures.clone(),
-            ..ReportEntry::default()
+            warnings: section.warnings.clone(),
         });
     }
     if stats.converted == 0 && stats.failures.is_empty() {
@@ -927,15 +947,8 @@ fn onepkg(
                 .unwrap_or_else(|| "package".to_string())
         )),
     };
-    let staging = std::env::temp_dir().join(format!(
-        "onenote2md-pkg-{}-{}",
-        std::process::id(),
-        input
-            .file_stem()
-            .map(|stem| stem.to_string_lossy().replace(['/', ' '], "_"))
-            .unwrap_or_default()
-    ));
-    let _ = std::fs::remove_dir_all(&staging);
+    let scratch = one_note_converter::temp::ScratchDir::new("onenote2md-pkg")?;
+    let staging = scratch.path().to_path_buf();
 
     let extracted: Result<(), String> = (|| {
         for (index, entry) in cabinet.entries.iter().enumerate() {
@@ -958,54 +971,32 @@ fn onepkg(
     let result = extracted.and_then(|()| {
         let tocs = root_level(&staging, "onetoc2");
         if tocs.is_empty() {
-            let mut failures = Vec::new();
-            let sections = root_level(&staging, "one");
-            if sections.is_empty() {
-                return Err("package contains no sections or table of contents".to_string());
+            let stats = one_note_converter::notebook::write_unindexed(
+                &staging,
+                &root,
+                options.front_matter,
+                options.split_pages,
+            )?;
+            for section in &stats.sections {
+                report.add(ReportEntry {
+                    path: section.input.display().to_string(),
+                    kind: "package-section",
+                    pages: section.pages,
+                    assets: section.assets,
+                    failures: section.failures.clone(),
+                    warnings: section.warnings.clone(),
+                });
             }
-            for section in sections {
-                let stem = section
-                    .file_stem()
-                    .map(|stem| stem.to_string_lossy().to_string())
-                    .unwrap_or_else(|| "section".to_string());
-                let bytes = std::fs::read(&section)
-                    .map_err(|error| format!("{}: {error}", section.display()))?;
-                let out_dir = root.join(&stem);
-                let assets = out_dir.join("assets");
-                std::fs::create_dir_all(&out_dir)
-                    .map_err(|error| format!("cannot create {}: {error}", out_dir.display()))?;
-                let output = out_dir.join(format!("{stem}.md"));
-                match one_note_converter::output::Section::read(bytes)
-                    .and_then(|section| section.write(&output, &assets, options.front_matter))
-                {
-                    Ok(stats) => {
-                        failures.extend(
-                            stats
-                                .failures
-                                .iter()
-                                .map(|error| format!("{stem}: {error}")),
-                        );
-                        report.add(ReportEntry {
-                            path: format!("{stem}.one"),
-                            kind: "package-section",
-                            pages: stats.pages,
-                            assets: stats.assets,
-                            ..ReportEntry::default()
-                        });
-                    }
-                    Err(error) => failures.push(format!("{stem}: {error}")),
-                }
-            }
-            if !failures.is_empty() {
+            if !stats.failures.is_empty() {
                 return Err(format!(
                     "{} section(s) could not be converted:\n  {}",
-                    failures.len(),
-                    failures.join("\n  ")
+                    stats.failures.len(),
+                    stats.failures.join("\n  ")
                 ));
             }
             eprintln!(
                 "wrote {} section(s) into {}",
-                report.entries.len(),
+                stats.converted,
                 root.display()
             );
             return Ok(());
@@ -1025,11 +1016,11 @@ fn onepkg(
                 report,
                 Some(&toc),
                 options.front_matter,
+                options.split_pages,
             )?;
         }
         Ok(())
     });
-    let _ = std::fs::remove_dir_all(&staging);
     result
 }
 
@@ -1052,6 +1043,32 @@ fn convert(
         );
     }
 
+    if options.split_pages {
+        let destination = options.output.map(PathBuf::from).unwrap_or_else(|| {
+            input.with_file_name(format!(
+                "{}_pages",
+                input.file_stem().unwrap_or_default().to_string_lossy()
+            ))
+        });
+        let stats = section.write_pages(&destination, options.front_matter)?;
+        report.add(ReportEntry {
+            path: input.display().to_string(),
+            kind,
+            pages: stats.pages,
+            assets: stats.assets,
+            failures: stats.failures.clone(),
+            warnings: stats.warnings.clone(),
+        });
+        if !stats.failures.is_empty() {
+            return Err(format!(
+                "could not write assets: {}",
+                stats.failures.join("; ")
+            ));
+        }
+        eprintln!("wrote {} pages into {}", stats.pages, destination.display());
+        return Ok(());
+    }
+
     let output = options.output.map(PathBuf::from);
     let base_dir = output
         .as_deref()
@@ -1072,13 +1089,7 @@ fn convert(
     let prefix = one_note_converter::output::relative_link_prefix(&base_dir, &assets_dir);
 
     let (markdown, stats) = section.materialize(&assets_dir, &prefix, options.front_matter)?;
-    let mut warnings: Vec<String> = section.store().warnings.clone();
-    if kind == "package" {
-        warnings.push(
-            "[MS-FSSHTTPB] package store support is experimental — page bodies may be incomplete"
-                .to_string(),
-        );
-    }
+    let warnings = stats.warnings.clone();
     report.add(ReportEntry {
         path: input.display().to_string(),
         kind,
