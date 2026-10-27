@@ -94,6 +94,7 @@ paths in `stats.failures` and still writes the Markdown.
 ## Tests
 
 ```bash
+pip install -r requirements-dev.txt   # maturin, pytest, twine
 python -m pytest tests -q
 ```
 

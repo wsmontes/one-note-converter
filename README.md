@@ -241,6 +241,16 @@ not depend on that project.
 
 ## Tests
 
+One command reproduces the CI gate locally (fmt, clippy, Rust tests, the Python
+extension and its tests, wheel/sdist plus `twine check`, and the workflows when
+`actionlint` is installed):
+
+```sh
+./scripts/check.sh
+```
+
+
+
 ```sh
 cargo test
 ```

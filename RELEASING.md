@@ -5,7 +5,11 @@ the version bump and the tag.
 
 > **Status (v0.1.0):** GitHub Actions cannot start on this account — every job
 > exits with *"The job was not started because your account is locked due to a
-> billing issue."* Until that is resolved, CI does not run and neither does
+> billing issue."* Fix it in **Settings → Billing** (the annotation is emitted
+> before any step, so no workflow change helps), then re-run the workflow with
+> `gh run rerun <id>`. Meanwhile use `./scripts/check.sh`, which is the CI gate
+> run locally. Runner labels are pinned (`ubuntu-24.04`, `macos-15`,
+> `macos-15-intel`, `windows-2025`) so migrations do not change the matrix. Until that is resolved, CI does not run and neither does
 > trusted publishing (OIDC) to PyPI. The working distribution path today is
 > Homebrew (tap + local build) and the artifacts attached to the GitHub release.
 > The two local upload commands at the end of sections 2 and 3 are the
