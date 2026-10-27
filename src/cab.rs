@@ -371,6 +371,15 @@ mod tests {
         assert!(bytes.iter().all(|byte| *byte == b'A'));
     }
 
+
+    #[test]
+    fn malformed_file_table_offset_is_an_error_not_a_panic() {
+        let mut bytes = build(&[("a.one", vec![1, 2, 3])], false);
+        let beyond = (bytes.len() + 4) as u32;
+        bytes[16..20].copy_from_slice(&beyond.to_le_bytes());
+        assert!(Cabinet::parse(&bytes).is_err());
+    }
+
     #[test]
     fn missing_signature_is_an_error() {
         assert!(Cabinet::parse(b"nope").is_err());
