@@ -12,7 +12,7 @@ use one_note_converter::notebook;
 use one_note_converter::output::{self, Section as RustSection};
 use pyo3::exceptions::{PyOSError, PyValueError};
 use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyBytes, PyByteArray, PyString};
+use pyo3::types::{PyAny, PyByteArray, PyBytes, PyString};
 
 fn error(message: String) -> PyErr {
     PyValueError::new_err(message)
@@ -28,8 +28,9 @@ fn read_source(source: &Bound<'_, PyAny>) -> PyResult<Vec<u8>> {
     }
     if source.is_instance_of::<PyString>() {
         let path: PathBuf = source.extract()?;
-        return std::fs::read(&path)
-            .map_err(|cause| PyOSError::new_err(format!("cannot read {}: {cause}", path.display())));
+        return std::fs::read(&path).map_err(|cause| {
+            PyOSError::new_err(format!("cannot read {}: {cause}", path.display()))
+        });
     }
     // Anything else that yields a path (os.PathLike).
     let path: PathBuf = source.extract()?;
@@ -584,7 +585,12 @@ fn read_package(path: PathBuf) -> PyResult<PyPackage> {
     for index in 0..cabinet.entries.len() {
         let bytes = cabinet
             .read(index)
-            .ok_or_else(|| error(format!("{}: payload is missing", cabinet.entries[index].name)))?
+            .ok_or_else(|| {
+                error(format!(
+                    "{}: payload is missing",
+                    cabinet.entries[index].name
+                ))
+            })?
             .to_vec();
         entries.push(cabinet.entries[index].name.clone());
         payloads.push(bytes);

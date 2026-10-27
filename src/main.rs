@@ -281,17 +281,7 @@ fn run(args: &[String]) -> Result<(), String> {
     let mut report = Report::default();
     match command.as_str() {
         "header" => print_header(&data)?,
-        "inspect" => inspect(
-            &data,
-            options.object,
-            options.find_text,
-            options.locate,
-            options.decls,
-            options.blob,
-            options.find_prop,
-            options.runs,
-            options.find_jcid,
-        )?,
+        "inspect" => inspect(&data, &options)?,
         command => {
             let result = match command {
                 "convert" => convert(&data, Path::new(path), &options, &mut report),
@@ -458,17 +448,15 @@ fn inspect_package(data: &[u8]) -> Result<(), String> {
     Ok(())
 }
 
-fn inspect(
-    data: &[u8],
-    object: Option<&str>,
-    find_text: Option<&str>,
-    locate: Option<&str>,
-    decls: bool,
-    blob: Option<&str>,
-    find_prop: Option<&str>,
-    runs: Option<&str>,
-    find_jcid: Option<&str>,
-) -> Result<(), String> {
+fn inspect(data: &[u8], options: &Options<'_>) -> Result<(), String> {
+    let object = options.object;
+    let find_text = options.find_text;
+    let locate = options.locate;
+    let decls = options.decls;
+    let blob = options.blob;
+    let find_prop = options.find_prop;
+    let runs = options.runs;
+    let find_jcid = options.find_jcid;
     let container = Header::parse(data)?.kind();
     if container == ContainerKind::PackageStore {
         inspect_package(data)?;

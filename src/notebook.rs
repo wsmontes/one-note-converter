@@ -77,13 +77,10 @@ fn read_entry(store: &Store, oid: u32, seen: &mut HashSet<u32>, depth: usize) ->
     if depth > 32 || !seen.insert(oid) {
         return None;
     }
-    let Some((_, object)) = store
+    let (_, object) = store
         .spaces
         .iter()
-        .find_map(|space| space.objects.get(&oid).map(|object| (space, object)))
-    else {
-        return None;
-    };
+        .find_map(|space| space.objects.get(&oid).map(|object| (space, object)))?;
 
     let name = object
         .props

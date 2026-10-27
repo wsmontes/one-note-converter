@@ -1,16 +1,41 @@
 # one-note-converter
 
-`onenote2md` — converts Microsoft OneNote section files (`.one`) to Markdown, in Rust, with no
-dependencies.
+[![CI](https://github.com/wsmontes/one-note-converter/actions/workflows/ci.yml/badge.svg)](https://github.com/wsmontes/one-note-converter/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/onenote-converter.svg)](https://pypi.org/project/onenote-converter/)
+[![crates.io](https://img.shields.io/crates/v/one-note-converter.svg)](https://crates.io/crates/one-note-converter)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Only the plain *revision store* layout is supported: files whose header carries the format GUID
-`{109ADD3F-911B-49F5-A5D0-1791EDC8AED8}` with a nil legacy file version.
+`onenote2md` converts Microsoft OneNote content to Markdown, in Rust, with the same parser exposed to
+Python.
 
-The same revision store also travels wrapped in the [MS-FSSHTTPB] package store
+|Input|Output|
+|---|---|
+|`.one` section|Markdown with headings, lists, tables, pictures, attachments, tags, ink markers|
+|`.onetoc2` notebook|a folder tree: one file per section plus an `index.md` per level|
+|`.onepkg` package (Microsoft Cabinet)|the notebook or sections inside it|
+
+Two on-disk layouts are read: plain revision stores (`[MS-ONESTORE]`,
+`{109ADD3F-911B-49F5-A5D0-1791EDC8AED8}`) and sections wrapped in the `[MS-FSSHTTPB]` package store
 (`{638DE92F-A6D4-4BC1-9A36-B3FC2511A5B7}`), which is how OneNote for Windows and OneDrive deliver
-sections. The wrapped payload holds the same object model, but reaching it needs FSSHTTPB
-data-element parsing (about 2 900 lines in a comparable implementation), so those files are rejected
-with that explanation instead of being mis-parsed.
+files. Packaged-store support is marked experimental in the output because page bodies can be
+incomplete; the warning is printed, counted in `--report`, and turns into a failure under `--strict`.
+
+## Install
+
+```sh
+# Python library (CPython >= 3.8, abi3 wheel; source build needs Rust)
+pip install onenote-converter
+
+# CLI on macOS or Linux
+brew install wsmontes/onenote/onenote2md
+
+# CLI from crates.io
+cargo install one-note-converter
+
+# from source
+git clone https://github.com/wsmontes/one-note-converter.git
+cd one-note-converter && cargo build --release   # target/release/onenote2md
+```
 
 ## Usage
 
@@ -186,14 +211,16 @@ converter renders the current revision and does not merge divergent edits.
 - Empty paragraphs that exist only for vertical spacing are not reproduced.
 - Note tags appear as a `[label]` prefix; the tag's own colour/shape is not reproduced.
 - Ink strokes are not rendered: the page shows a `> ink drawing not rendered` marker where they were.
-- Front matter (dates, authors) is not written yet.
-
+- Front matter is opt-in (`--front-matter`, `markdown(front_matter=True)`) and best effort: a page
+  that recorded no date simply omits the key.
 - `Charset` other than the default code page (0, Windows-1252) is not honoured; East Asian
   single-byte text would need the matching code page.
-- Sections wrapped in the [MS-FSSHTTPB] package store are rejected (see above); `.onetoc2` files are
-  rejected as the wrong file type.
-- Files whose live content is only described by the transaction log are not replayed; the parser
-  reads object groups.
+- Packaged stores (`[MS-FSSHTTPB]`) are experimental: page bodies can be incomplete and the run
+  reports it as a warning.
+- Encrypted sections are detected and reported; their content is not decrypted.
+- Pictures that a file references without a payload (web clippings, external caches) are named in the
+  Markdown and listed by `missing_images()`; there are no bytes to write.
+- Quantum and LZX cabinet compression is rejected; stored and MSZIP folders are read.
 
 ## Provenance and license
 

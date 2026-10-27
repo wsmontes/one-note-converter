@@ -1,10 +1,31 @@
-[package]
-name = "one-note-converter"
+[workspace]
+members = [".", "python"]
+resolver = "2"
+
+[workspace.package]
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.75"
-description = "Converter for Microsoft OneNote .one section files to Markdown"
+rust-version = "1.82"
 license = "MIT"
+repository = "https://github.com/wsmontes/one-note-converter"
+homepage = "https://github.com/wsmontes/one-note-converter"
+authors = ["Wagner Montes <wmontes@gmail.com>"]
+
+[package]
+name = "one-note-converter"
+description = "Convert Microsoft OneNote .one sections, .onetoc2 notebooks and .onepkg packages to Markdown"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+documentation = "https://docs.rs/one-note-converter"
+readme = "README.md"
+keywords = ["onenote", "markdown", "ms-onestore", "converter", "notes"]
+categories = ["parser-implementations", "command-line-utilities"]
+exclude = ["python", ".github", "target"]
 
 [[bin]]
 name = "onenote2md"
@@ -12,3 +33,6 @@ path = "src/main.rs"
 
 [dependencies]
 flate2 = { version = "1", default-features = false, features = ["zlib-rs"] }
+
+[package.metadata.docs.rs]
+all-features = true

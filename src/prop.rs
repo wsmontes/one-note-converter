@@ -320,7 +320,7 @@ pub fn parse_object_prop_set(data: &[u8], offset: usize) -> ParseResult<ObjectPr
     Ok(out)
 }
 
-fn take<'a>(data: &'a [u8], pos: usize, len: usize) -> ParseResult<&'a [u8]> {
+fn take(data: &[u8], pos: usize, len: usize) -> ParseResult<&[u8]> {
     slice_at(data, pos, len)
 }
 

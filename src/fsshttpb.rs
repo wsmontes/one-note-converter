@@ -860,7 +860,7 @@ mod tests {
     #[test]
     fn object_headers_decode_type_and_length() {
         // 16-bit header, type 0x15 (DataElementPackage), length 0: 0x15 << 3
-        let data = ((object_type::DATA_ELEMENT_PACKAGE as u16) << 3).to_le_bytes();
+        let data = (object_type::DATA_ELEMENT_PACKAGE << 3).to_le_bytes();
         let mut cursor = Cursor::new(&data);
         let header = ObjectHeader::parse_16(&mut cursor).unwrap();
         assert_eq!(header.object_type, object_type::DATA_ELEMENT_PACKAGE);

@@ -1,10 +1,15 @@
 [package]
 name = "onenote-py"
-version = "0.1.0"
-edition = "2021"
-rust-version = "1.75"
 description = "Python bindings for the OneNote (MS-ONESTORE) reader"
-license = "MIT"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+# Published to PyPI as a wheel/sdist, never as a crate.
+publish = false
 
 [lib]
 name = "onenote"
@@ -18,4 +23,4 @@ extension-module = ["pyo3/extension-module"]
 
 [dependencies]
 pyo3 = { version = "0.23", features = ["abi3-py38"] }
-one-note-converter = { path = ".." }
+one-note-converter = { path = "..", version = "0.1.0" }

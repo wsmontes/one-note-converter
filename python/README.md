@@ -1,5 +1,7 @@
 # onenote — Python bindings
 
+`pip install onenote-converter` (the distribution is `onenote-converter`, the module is `onenote`).
+
 Python API over the same Rust parser the `onenote2md` CLI uses. Nothing is
 re-implemented here: a `.one` section, a `.onetoc2` notebook and a `.onepkg`
 package are parsed by the crate in the parent directory.
@@ -12,7 +14,7 @@ Requires Rust (stable) only when building.
 # development: build and install into the active virtualenv
 python -m venv .venv && . .venv/bin/activate
 pip install maturin
-maturin develop --release
+maturin develop --release   # or: maturin build --release + pip install target/wheels/*.whl
 
 # a wheel for distribution (abi3: one wheel for CPython ≥ 3.8)
 maturin build --release      # → target/wheels/onenote-<ver>-cp38-abi3-<platform>.whl
