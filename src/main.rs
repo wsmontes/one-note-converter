@@ -928,15 +928,8 @@ fn onepkg(
                 .unwrap_or_else(|| "package".to_string())
         )),
     };
-    let staging = std::env::temp_dir().join(format!(
-        "onenote2md-pkg-{}-{}",
-        std::process::id(),
-        input
-            .file_stem()
-            .map(|stem| stem.to_string_lossy().replace(['/', ' '], "_"))
-            .unwrap_or_default()
-    ));
-    let _ = std::fs::remove_dir_all(&staging);
+    let scratch = one_note_converter::temp::ScratchDir::new("onenote2md-pkg")?;
+    let staging = scratch.path().to_path_buf();
 
     let extracted: Result<(), String> = (|| {
         for (index, entry) in cabinet.entries.iter().enumerate() {
@@ -1032,7 +1025,6 @@ fn onepkg(
         }
         Ok(())
     });
-    let _ = std::fs::remove_dir_all(&staging);
     result
 }
 
