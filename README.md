@@ -1,8 +1,5 @@
 # one-note-converter
 
-[![CI](https://github.com/wsmontes/one-note-converter/actions/workflows/ci.yml/badge.svg)](https://github.com/wsmontes/one-note-converter/actions/workflows/ci.yml)
-[![PyPI](https://img.shields.io/pypi/v/onenote-converter.svg)](https://pypi.org/project/onenote-converter/)
-[![crates.io](https://img.shields.io/crates/v/one-note-converter.svg)](https://crates.io/crates/one-note-converter)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 `onenote2md` converts Microsoft OneNote content to Markdown, in Rust, with the same parser exposed to
@@ -22,19 +19,26 @@ incomplete; the warning is printed, counted in `--report`, and turns into a fail
 
 ## Install
 
-```sh
-# Python library (CPython >= 3.8, abi3 wheel; source build needs Rust)
-pip install onenote-converter
+Installing from the repository works today; the two registry commands below become
+available after the first upload (see `RELEASING.md`).
 
-# CLI on macOS or Linux
+```sh
+# CLI, macOS or Linux — builds from the tagged source
 brew install wsmontes/onenote/onenote2md
 
-# CLI from crates.io
-cargo install one-note-converter
-
-# from source
+# from source (CLI + library + Python module)
 git clone https://github.com/wsmontes/one-note-converter.git
 cd one-note-converter && cargo build --release   # target/release/onenote2md
+cd python && python -m venv .venv && . .venv/bin/activate
+pip install maturin && maturin develop --release
+
+# or install the wheel attached to the release (pick your platform's file)
+# https://github.com/wsmontes/one-note-converter/releases/tag/v0.1.0
+pip install ./onenote_converter-0.1.0-cp38-abi3-macosx_11_0_arm64.whl
+
+# after the first publish to the registries
+pip install onenote-converter      # CPython >= 3.8, abi3 wheel
+cargo install one-note-converter
 ```
 
 ## Usage
