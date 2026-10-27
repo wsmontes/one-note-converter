@@ -241,9 +241,13 @@ not depend on that project.
 
 ## Tests
 
-One command reproduces the CI gate locally (fmt, clippy, Rust tests, the Python
-extension and its tests, wheel/sdist plus `twine check`, and the workflows when
-`actionlint` is installed):
+`./scripts/check.sh` runs the same commands the CI workflow runs, in the same
+order: `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D
+warnings`, `cargo test --release -p one-note-converter`, `maturin develop` plus
+`pytest -q`, `maturin build --sdist` with `twine check`, installing that sdist
+into a clean venv, and `actionlint` when it is installed. It works on a bare
+checkout: without `python/.venv` it creates a throwaway one from
+`python/requirements-dev.txt`.
 
 ```sh
 ./scripts/check.sh

@@ -5,3 +5,8 @@
 /python/dist
 __pycache__/
 .pytest_cache/
+
+# local gate scratch
+/.check-venv
+/.check-sdist
+/dist
