@@ -519,6 +519,7 @@ pub fn write_unindexed(
     split_pages: bool,
 ) -> Result<TreeStats, String> {
     let mut stats = TreeStats::default();
+    #[allow(clippy::too_many_arguments)]
     fn visit(
         source: &Path,
         current: &Path,
