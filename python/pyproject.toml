@@ -34,3 +34,5 @@ Issues = "https://github.com/wsmontes/one-note-converter/issues"
 module-name = "onenote"
 manifest-path = "Cargo.toml"
 features = ["extension-module"]
+# Repository housekeeping does not belong in the sdist.
+exclude = [".gitignore", "PLAN.md"]

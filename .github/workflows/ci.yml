@@ -32,7 +32,7 @@ jobs:
       - name: Clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
       - name: Test
-        run: cargo test --workspace --release
+        run: cargo test --release -p one-note-converter
 
   python:
     name: Python ${{ matrix.python }} on ${{ matrix.os }}

@@ -33,12 +33,12 @@ cd one-note-converter && cargo build --release   # target/release/onenote2md
 cd python && python -m venv .venv && . .venv/bin/activate
 pip install maturin && maturin develop --release
 
-# or install the wheel attached to the release (pick your platform's file)
-# https://github.com/wsmontes/one-note-converter/releases/tag/v0.1.0
-pip install ./onenote_converter-0.1.0-cp38-abi3-macosx_11_0_arm64.whl
+# or install an artifact from the release page (v0.1.0 ships a macOS arm64 wheel
+# and a portable sdist that builds anywhere Rust is available)
+pip install https://github.com/wsmontes/one-note-converter/releases/download/v0.1.0/onenote_converter-0.1.0.tar.gz
 
 # after the first publish to the registries
-pip install onenote-converter      # CPython >= 3.8, abi3 wheel
+pip install onenote-converter      # CPython >= 3.9, abi3 wheel
 cargo install one-note-converter
 ```
 

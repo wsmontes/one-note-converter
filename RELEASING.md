@@ -44,6 +44,12 @@ One-time setup:
 2. In the GitHub repo, create an environment named `pypi`.
 3. Set the repository variable `PYPI_PUBLISH=true`.
 
+The tag `v0.1.0` was cut before a few documentation-only commits landed on
+`main` (the `brew trust` step and the abi3 floor in the README). The `v0.1.0`
+source tarball therefore carries the earlier text; `0.2.0` will include them.
+Don't move the tag — that would change the Homebrew checksum and re-trigger the
+blocked workflow for a text-only diff.
+
 Until step 3 the publish job is skipped, so a tag never leaves a red run behind.
 From then on, pushing a tag publishes automatically (with PEP 740 attestations).
 

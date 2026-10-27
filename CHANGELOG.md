@@ -38,8 +38,7 @@ First release: a CLI, a Rust library and Python bindings over one parser.
 ### Notes
 
 - Encrypted sections are detected and reported; their content is not decrypted.
-- `cacheRead` style provider quirks and other converter-side details live in
-  `PLAN.md`.
+- Format decisions and the measurements behind them are recorded in `PLAN.md`.
 
 [Unreleased]: https://github.com/wsmontes/one-note-converter/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/wsmontes/one-note-converter/releases/tag/v0.1.0
