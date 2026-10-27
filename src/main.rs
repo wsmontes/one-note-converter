@@ -862,7 +862,14 @@ fn notebook(
                 .unwrap_or_else(|| "notebook".to_string())
         )),
     };
-    notebook_into(&base, root, report, Some(toc_path), options.front_matter, options.split_pages)
+    notebook_into(
+        &base,
+        root,
+        report,
+        Some(toc_path),
+        options.front_matter,
+        options.split_pages,
+    )
 }
 
 /// Convert every section reachable from a table of contents into `root`.
@@ -879,7 +886,13 @@ fn notebook_into(
     std::fs::create_dir_all(&root)
         .map_err(|error| format!("cannot create {}: {error}", root.display()))?;
 
-    let stats = one_note_converter::notebook::write_tree_with_options(base, &root, front_matter, toc, split_pages)?;
+    let stats = one_note_converter::notebook::write_tree_with_options(
+        base,
+        &root,
+        front_matter,
+        toc,
+        split_pages,
+    )?;
     for section in &stats.sections {
         report.add(ReportEntry {
             path: section.input.display().to_string(),
@@ -960,20 +973,33 @@ fn onepkg(
         let tocs = root_level(&staging, "onetoc2");
         if tocs.is_empty() {
             let stats = one_note_converter::notebook::write_unindexed(
-                &staging, &root, options.front_matter, options.split_pages
+                &staging,
+                &root,
+                options.front_matter,
+                options.split_pages,
             )?;
             for section in &stats.sections {
                 report.add(ReportEntry {
                     path: section.input.display().to_string(),
-                    kind: "package-section", pages: section.pages, assets: section.assets,
-                    failures: section.failures.clone(), warnings: section.warnings.clone(),
+                    kind: "package-section",
+                    pages: section.pages,
+                    assets: section.assets,
+                    failures: section.failures.clone(),
+                    warnings: section.warnings.clone(),
                 });
             }
             if !stats.failures.is_empty() {
-                return Err(format!("{} section(s) could not be converted:\n  {}",
-                    stats.failures.len(), stats.failures.join("\n  ")));
+                return Err(format!(
+                    "{} section(s) could not be converted:\n  {}",
+                    stats.failures.len(),
+                    stats.failures.join("\n  ")
+                ));
             }
-            eprintln!("wrote {} section(s) into {}", stats.converted, root.display());
+            eprintln!(
+                "wrote {} section(s) into {}",
+                stats.converted,
+                root.display()
+            );
             return Ok(());
         }
         for toc in tocs {
@@ -1021,17 +1047,24 @@ fn convert(
     if options.split_pages {
         let destination = options.output.map(PathBuf::from).unwrap_or_else(|| {
             input.with_file_name(format!(
-                "{}_pages", input.file_stem().unwrap_or_default().to_string_lossy()
+                "{}_pages",
+                input.file_stem().unwrap_or_default().to_string_lossy()
             ))
         });
         let stats = section.write_pages(&destination, options.front_matter)?;
         report.add(ReportEntry {
-            path: input.display().to_string(), kind, pages: stats.pages,
-            assets: stats.assets, failures: stats.failures.clone(),
+            path: input.display().to_string(),
+            kind,
+            pages: stats.pages,
+            assets: stats.assets,
+            failures: stats.failures.clone(),
             warnings: stats.warnings.clone(),
         });
         if !stats.failures.is_empty() {
-            return Err(format!("could not write assets: {}", stats.failures.join("; ")));
+            return Err(format!(
+                "could not write assets: {}",
+                stats.failures.join("; ")
+            ));
         }
         eprintln!("wrote {} pages into {}", stats.pages, destination.display());
         return Ok(());
