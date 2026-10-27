@@ -203,19 +203,25 @@ impl Section {
             let label = format!("{}-{}-{}.md", page.title, page.space_index, page.oid);
             let filename = unique_name(&label, &mut used);
             let mut resolver = |image: &AssetRef| {
-                image.guid.and_then(|guid| names.get(&guid))
+                image
+                    .guid
+                    .and_then(|guid| names.get(&guid))
                     .map(|name| join_link("assets", name))
                     .unwrap_or_else(|| link_name(image))
             };
             let text = markdown::render_with_options(
-                std::slice::from_ref(page), &mut resolver, front_matter
+                std::slice::from_ref(page),
+                &mut resolver,
+                front_matter,
             );
             let file = out.join(&filename);
             std::fs::write(&file, text)
                 .map_err(|error| format!("cannot write {}: {error}", file.display()))?;
-            index.push_str(&format!("- [{}]({})\n",
+            index.push_str(&format!(
+                "- [{}]({})\n",
                 page.title.replace('[', "\\[").replace(']', "\\]"),
-                escape_link(&filename)));
+                escape_link(&filename)
+            ));
         }
         std::fs::write(out.join("index.md"), index)
             .map_err(|error| format!("cannot write {}/index.md: {error}", out.display()))?;
@@ -343,8 +349,24 @@ pub fn unique_name(filename: &str, written: &mut BTreeSet<String>) -> String {
 fn percent_encode(name: &str) -> String {
     let mut out = String::with_capacity(name.len());
     for c in name.chars() {
-        if matches!(c, ' ' | '(' | ')' | '%' | '#' | '?' | '<' | '>' | '['
-                    | ']' | '\\' | '&' | '\'' | '"' | '\n' | '\r') {
+        if matches!(
+            c,
+            ' ' | '('
+                | ')'
+                | '%'
+                | '#'
+                | '?'
+                | '<'
+                | '>'
+                | '['
+                | ']'
+                | '\\'
+                | '&'
+                | '\''
+                | '"'
+                | '\n'
+                | '\r'
+        ) {
             out.push_str(&format!("%{:02X}", c as u32));
         } else {
             // Preserve readable Unicode; escape only URI/Markdown delimiters.
@@ -464,9 +486,15 @@ pub fn package_path(name: &str) -> Option<PathBuf> {
 /// A TOC element is a file or folder name, never a path.
 /// Validate before using it for either reading or writing.
 pub fn safe_toc_name(name: &str) -> Option<&str> {
-    if name.is_empty() || name == "." || name == ".." || name.ends_with('.')
-        || name.ends_with(' ') || name.chars().any(|c| matches!(c, '/' | '\\' | ':'))
-        || name.chars().any(|c| c.is_control() || "<>\"|?*".contains(c))
+    if name.is_empty()
+        || name == "."
+        || name == ".."
+        || name.ends_with('.')
+        || name.ends_with(' ')
+        || name.chars().any(|c| matches!(c, '/' | '\\' | ':'))
+        || name
+            .chars()
+            .any(|c| c.is_control() || "<>\"|?*".contains(c))
     {
         None
     } else {
@@ -519,19 +547,40 @@ mod safety_tests {
 
     #[test]
     fn split_pages_has_one_front_matter_per_markdown_file() {
-        let mut a = Page { title: "Page #1".into(), oid: 1, ..Page::default() };
-        a.blocks.push(doc::Block::Paragraph { text: "alpha".into(), level: 0 });
-        let mut b = Page { title: "Page #2".into(), oid: 2, ..Page::default() };
-        b.blocks.push(doc::Block::Paragraph { text: "beta".into(), level: 0 });
-        let section = Section { data: Vec::new(), store: store::Store::default(), pages: vec![a, b] };
+        let mut a = Page {
+            title: "Page #1".into(),
+            oid: 1,
+            ..Page::default()
+        };
+        a.blocks.push(doc::Block::Paragraph {
+            text: "alpha".into(),
+            level: 0,
+        });
+        let mut b = Page {
+            title: "Page #2".into(),
+            oid: 2,
+            ..Page::default()
+        };
+        b.blocks.push(doc::Block::Paragraph {
+            text: "beta".into(),
+            level: 0,
+        });
+        let section = Section {
+            data: Vec::new(),
+            store: store::Store::default(),
+            pages: vec![a, b],
+        };
         let scratch = crate::temp::ScratchDir::new("onenote-pages-test").unwrap();
         let stats = section.write_pages(scratch.path(), true).unwrap();
         assert_eq!(stats.pages, 2);
-        let pages: Vec<_> = std::fs::read_dir(scratch.path()).unwrap()
+        let pages: Vec<_> = std::fs::read_dir(scratch.path())
+            .unwrap()
             .filter_map(Result::ok)
             .map(|entry| entry.path())
-            .filter(|path| path.extension().is_some_and(|ext| ext == "md")
-                        && path.file_name().is_some_and(|name| name != "index.md"))
+            .filter(|path| {
+                path.extension().is_some_and(|ext| ext == "md")
+                    && path.file_name().is_some_and(|name| name != "index.md")
+            })
             .collect();
         assert_eq!(pages.len(), 2);
         for file in pages {
