@@ -24,6 +24,7 @@ available after the first upload (see `RELEASING.md`).
 
 ```sh
 # CLI, macOS or Linux — builds from the tagged source
+brew trust wsmontes/onenote        # Homebrew asks once for third-party taps
 brew install wsmontes/onenote/onenote2md
 
 # from source (CLI + library + Python module)
