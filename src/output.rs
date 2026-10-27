@@ -26,6 +26,8 @@ pub struct SectionStats {
     pub assets: usize,
     /// Pictures that could not be written (link target, then the OS error).
     pub failures: Vec<String>,
+    /// Missing payloads and parser or format limitations.
+    pub warnings: Vec<String>,
 }
 
 /// A parsed section file (`.one`), with its pages and embedded data.
@@ -137,8 +139,15 @@ impl Section {
         prefix: &str,
         front_matter: bool,
     ) -> Result<(String, SectionStats), String> {
-        let (names, images, _) = self.named_images();
+        let (names, images, missing) = self.named_images();
         let mut failures: Vec<String> = Vec::new();
+        let mut warnings = self.store.warnings.clone();
+        for name in missing {
+            warnings.push(format!("asset {name:?} has no embedded payload"));
+        }
+        if self.store.header.kind() == crate::header::ContainerKind::PackageStore {
+            warnings.push("[MS-FSSHTTPB] support is experimental; page bodies may be incomplete".into());
+        }
         let mut assets_written = 0usize;
         for image in &images {
             let path = assets.join(&image.filename);
@@ -169,6 +178,7 @@ impl Section {
                 pages: self.pages.len(),
                 assets: assets_written,
                 failures,
+                warnings,
             },
         ))
     }
@@ -263,15 +273,21 @@ pub fn unique_name(filename: &str, written: &mut BTreeSet<String>) -> String {
         .next()
         .unwrap_or("image")
         .chars()
-        .map(|c| if c.is_control() { '_' } else { c })
+        .map(|c| if c.is_control() || "<>:\"|?*".contains(c) { '_' } else { c })
         .collect();
-    let mut candidate = sanitized;
+    let sanitized = sanitized.trim_end_matches(['.', ' ']);
+    let sanitized = if sanitized.is_empty() || sanitized == "." || sanitized == ".." {
+        "image"
+    } else {
+        sanitized
+    };
+    let (stem, extension) = match sanitized.rsplit_once('.') {
+        Some((stem, ext)) if !stem.is_empty() => (stem.to_string(), format!(".{ext}")),
+        _ => (sanitized.to_string(), String::new()),
+    };
+    let mut candidate = sanitized.to_string();
     let mut counter = 2;
     while !written.insert(candidate.clone()) {
-        let (stem, extension) = match candidate.rsplit_once('.') {
-            Some((stem, extension)) => (stem.to_string(), format!(".{extension}")),
-            None => (candidate.clone(), String::new()),
-        };
         candidate = format!("{stem}-{counter}{extension}");
         counter += 1;
     }
@@ -279,14 +295,37 @@ pub fn unique_name(filename: &str, written: &mut BTreeSet<String>) -> String {
 }
 
 fn percent_encode(name: &str) -> String {
-    name.chars()
-        .map(|c| match c {
-            ' ' => "%20".to_string(),
-            '(' => "%28".to_string(),
-            ')' => "%29".to_string(),
-            other => other.to_string(),
-        })
-        .collect()
+    let mut escaped = String::new();
+    for byte in name.bytes() {
+        match byte {
+            b' ' | b'(' | b')' | b'%' | b'#' | b'?' | b'<' | b'>' | b'[' | b']'
+            | b'\\' | b'&' | b'\'' | b'"' | b'\n' | b'\r' => {
+                escaped.push_str(&format!("%{byte:02X}"));
+            }
+            // Leave Unicode UTF-8 untouched for readable, portable links.
+            _ => escaped.push(byte as char),
+        }
+    }
+    // Reconstitute UTF-8: percent-encoded bytes are ASCII; unescaped bytes
+    // should stay as valid UTF-8, rather than mojibake.
+    if name.is_ascii() {
+        return escaped;
+    }
+    let mut result = String::new();
+    for ch in name.chars() {
+        if ch.is_ascii() {
+            let b = ch as u8;
+            if matches!(b, b' ' | b'(' | b')' | b'%' | b'#' | b'?' | b'<' | b'>'
+                | b'[' | b']' | b'\\' | b'&' | b'\'' | b'"' | b'\n' | b'\r') {
+                result.push_str(&format!("%{b:02X}"));
+            } else {
+                result.push(ch);
+            }
+        } else {
+            result.push(ch);
+        }
+    }
+    result
 }
 
 pub fn escape_link(name: &str) -> String {
@@ -304,19 +343,31 @@ pub fn join_link(prefix: &str, name: &str) -> String {
 
 /// Link prefix that turns `assets` into a path relative to `base`.
 pub fn relative_link_prefix(base: &Path, assets: &Path) -> String {
-    let normalize = |path: &Path| -> PathBuf {
-        std::path::absolute(path).unwrap_or_else(|_| path.to_path_buf())
+    use std::path::Component;
+    let clean = |path: &Path| -> PathBuf {
+        let absolute = std::path::absolute(path).unwrap_or_else(|_| path.to_path_buf());
+        let mut result = PathBuf::new();
+        for component in absolute.components() {
+            match component {
+                Component::CurDir => {}
+                Component::ParentDir => { result.pop(); }
+                other => result.push(other.as_os_str()),
+            }
+        }
+        result
     };
-    let base = normalize(base);
-    let assets = normalize(assets);
-    match assets.strip_prefix(&base) {
-        Ok(relative) => relative
-            .components()
-            .map(|c| c.as_os_str().to_string_lossy().to_string())
-            .collect::<Vec<_>>()
-            .join("/"),
-        Err(_) => assets.to_string_lossy().to_string(),
+    let base = clean(base);
+    let assets = clean(assets);
+    let from: Vec<_> = base.components().collect();
+    let to: Vec<_> = assets.components().collect();
+    let common = from.iter().zip(&to).take_while(|(a, b)| a == b).count();
+    // Different volume roots (e.g. Windows drives) have no portable relative link.
+    if common == 0 {
+        return assets.to_string_lossy().replace('\\', "/");
     }
+    let mut parts = vec!["..".to_string(); from.len() - common];
+    parts.extend(to[common..].iter().map(|part| part.as_os_str().to_string_lossy().to_string()));
+    parts.join("/")
 }
 
 /// The `<name>.onetoc2` that describes a folder's notebook.
@@ -374,17 +425,31 @@ pub fn root_level(dir: &Path, extension: &str) -> Vec<PathBuf> {
 /// Reject absolute paths and `..` components coming from a package.
 pub fn package_path(name: &str) -> Option<PathBuf> {
     let normalised = name.replace('\\', "/");
+    if normalised.starts_with('/') || normalised.chars().any(|c| c.is_control()) {
+        return None;
+    }
     let mut path = PathBuf::new();
     for part in normalised.split('/') {
-        match part {
-            "" | "." => continue,
-            ".." => return None,
-            other => path.push(other),
+        if part == ".." || part.contains(':') {
+            return None;
         }
+        if part.is_empty() || part == "." {
+            continue;
+        }
+        path.push(part);
     }
-    if path.as_os_str().is_empty() {
+    (!path.as_os_str().is_empty()).then_some(path)
+}
+
+/// A TOC element is a file or folder name, never a path.
+/// Validate before using it for either reading or writing.
+pub fn safe_toc_name(name: &str) -> Option<&str> {
+    if name.is_empty() || name == "." || name == ".." || name.ends_with('.')
+        || name.ends_with(' ') || name.contains(['/', '\\', ':'])
+        || name.chars().any(|c| c.is_control() || "<>\"|?*".contains(c))
+    {
         None
     } else {
-        Some(path)
+        Some(name)
     }
 }
