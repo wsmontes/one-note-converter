@@ -18,11 +18,33 @@ the version bump and the tag.
 > The workflow name and environment must match those exact values — a pending
 > publisher saved with another workflow filename fails as `invalid-publisher`.
 >
-> Left: crates.io. It needs the `CARGO_REGISTRY_TOKEN` secret (or a local
-> `cargo publish -p one-note-converter --locked`); until it exists the job is
-> skipped and a tag run stays green. Remember that a PyPI/crates.io version
-> cannot be re-uploaded, so every release needs a version bump. Build outputs
-> (`dist/`) are gitignored — release assets are the distributables.
+> Because `PYPI_PUBLISH=true`, **every tag now publishes to PyPI
+> automatically** (OIDC, no token) — that is the intended behaviour.
+>
+> Two consequences to keep in mind:
+>
+> - A published version is immutable on PyPI (and on crates.io). Re-running
+>   `gh workflow run release.yml --ref v0.1.2` for an already published version
+>   fails with *File already exists*: `pypa/gh-action-pypi-publish` defaults
+>   `skip-existing` to `false`. Fix something by bumping the version and tagging
+>   again; only if you truly must re-drive the same version add
+>   `with: skip-existing: true` to that step.
+> - The `github-release` job re-uploads the same assets with `--clobber`, which is
+>   harmless.
+>
+> Left: crates.io. No token is configured anywhere (`gh secret list` is empty and
+> `~/.cargo/credentials` does not exist), so the publish job is skipped. Two ways:
+>
+> ```sh
+> # from CI, on a tag
+> gh secret set CARGO_REGISTRY_TOKEN
+>
+> # or once, locally
+> cargo login            # stores ~/.cargo/credentials
+> cargo publish -p one-note-converter --locked
+> ```
+>
+> Build outputs (`dist/`) are gitignored — release assets are the distributables.
 
 ## 1. Version bump
 

@@ -19,27 +19,27 @@ incomplete; the warning is printed, counted in `--report`, and turns into a fail
 
 ## Install
 
-Installing from the repository works today; the two registry commands below become
-available after the first upload (see `RELEASING.md`).
-
 ```sh
+# Python library — published on PyPI (CPython >= 3.9, abi3 wheels for
+# Linux, macOS and Windows)
+pip install onenote-converter        # https://pypi.org/project/onenote-converter/
+
 # CLI, macOS or Linux — builds from the tagged source
-brew trust wsmontes/onenote        # Homebrew asks once for third-party taps
+brew trust wsmontes/onenote          # one-time, for third-party taps
 brew install wsmontes/onenote/onenote2md
 
-# from source (CLI + library + Python module)
+# CLI plus library plus Python module, from source
 git clone https://github.com/wsmontes/one-note-converter.git
 cd one-note-converter && cargo build --release   # target/release/onenote2md
 cd python && python -m venv .venv && . .venv/bin/activate
-pip install maturin && maturin develop --release
+pip install -r requirements-dev.txt && maturin develop --release
 
 # or install an artifact from the release page (each release ships five wheels
 # plus a portable sdist that builds anywhere Rust is available)
 pip install https://github.com/wsmontes/one-note-converter/releases/download/v0.1.2/onenote_converter-0.1.2.tar.gz
 
-# after the first publish to the registries
-pip install onenote-converter      # CPython >= 3.9, abi3 wheel
-cargo install one-note-converter
+# crates.io is not published yet; once it is:
+# cargo install one-note-converter
 ```
 
 ## Usage
