@@ -262,10 +262,6 @@ fn read_level(folder: &Path, toc: Option<&Path>, depth: usize) -> Notebook {
             notebook.errors.push(format!("unsafe group name in TOC: {name:?}"));
             continue;
         }
-        if output::safe_toc_name(&name).is_none() {
-            stats.failures.push(format!("unsafe group name in TOC: {name:?}"));
-            continue;
-        }
         let source = folder.join(&name);
         if !source.is_dir() {
             notebook
@@ -419,6 +415,10 @@ fn write_level(
         } else {
             entry.name.trim_end_matches(".one").to_string()
         };
+        if output::safe_toc_name(&name).is_none() {
+            stats.failures.push(format!("unsafe group name in TOC: {name:?}"));
+            continue;
+        }
         let source = folder.join(&name);
         if !source.is_dir() {
             // A partial notebook must fail, not quietly convert the rest.
