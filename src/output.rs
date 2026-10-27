@@ -498,6 +498,30 @@ mod safety_tests {
     }
 
     #[test]
+    fn split_pages_has_one_front_matter_per_markdown_file() {
+        let mut a = Page { title: "Page #1".into(), oid: 1, ..Page::default() };
+        a.blocks.push(doc::Block::Paragraph { text: "alpha".into(), level: 0 });
+        let mut b = Page { title: "Page #2".into(), oid: 2, ..Page::default() };
+        b.blocks.push(doc::Block::Paragraph { text: "beta".into(), level: 0 });
+        let section = Section { data: Vec::new(), store: store::Store::default(), pages: vec![a, b] };
+        let scratch = crate::temp::ScratchDir::new("onenote-pages-test").unwrap();
+        let stats = section.write_pages(scratch.path(), true).unwrap();
+        assert_eq!(stats.pages, 2);
+        let pages: Vec<_> = std::fs::read_dir(scratch.path()).unwrap()
+            .filter_map(Result::ok)
+            .map(|entry| entry.path())
+            .filter(|path| path.extension().is_some_and(|ext| ext == "md")
+                        && path.file_name().is_some_and(|name| name != "index.md"))
+            .collect();
+        assert_eq!(pages.len(), 2);
+        for file in pages {
+            let text = std::fs::read_to_string(file).unwrap();
+            assert!(text.starts_with("---\ntitle:"));
+            assert_eq!(text.matches("---\n").count(), 2);
+        }
+    }
+
+    #[test]
     fn missing_payload_is_reported_during_materialization() {
         let mut page = Page { title: "Pictures".into(), ..Page::default() };
         page.blocks.push(doc::Block::Image(AssetRef {
