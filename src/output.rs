@@ -145,6 +145,9 @@ impl Section {
         for name in missing {
             warnings.push(format!("asset {name:?} has no embedded payload"));
         }
+        if front_matter && self.pages.len() > 1 {
+            warnings.push("combined section has multiple YAML headers; use --split-pages to preserve each page's metadata".into());
+        }
         if self.store.header.kind() == crate::header::ContainerKind::PackageStore {
             warnings.push(
                 "[MS-FSSHTTPB] support is experimental; page bodies may be incomplete".into(),
@@ -404,22 +407,10 @@ pub fn relative_link_prefix(base: &Path, assets: &Path) -> String {
 /// A dotfile `.onetoc2` is the OneNote Recycle Bin sentinel, not a notebook
 /// index, so it never counts.
 pub fn find_toc(folder: &Path) -> Option<PathBuf> {
-    let entries = std::fs::read_dir(folder).ok()?;
-    for entry in entries.flatten() {
-        let path = entry.path();
-        let is_toc = path
-            .extension()
-            .map(|ext| ext == "onetoc2")
-            .unwrap_or(false);
-        let hidden = path
-            .file_stem()
-            .map(|stem| stem.to_string_lossy().starts_with('.'))
-            .unwrap_or(false);
-        if is_toc && !hidden {
-            return Some(path);
-        }
-    }
-    None
+    let mut candidates = root_level(folder, "onetoc2");
+    candidates.retain(|path| !path.file_stem()
+        .is_some_and(|stem| stem.to_string_lossy().starts_with('.')));
+    candidates.into_iter().next()
 }
 
 /// Subdirectories that carry their own table of contents (section groups).
