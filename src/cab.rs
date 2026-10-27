@@ -108,7 +108,8 @@ impl Cabinet {
                     .unwrap(),
             ) as usize;
             let name_at = cursor + 16;
-            let end = data.get(name_at..)
+            let end = data
+                .get(name_at..)
                 .ok_or("CFFILE name offset exceeds cabinet length")?
                 .iter()
                 .position(|byte| *byte == 0)
@@ -189,10 +190,13 @@ fn decompress_folder(data: &[u8], folder: &Folder) -> Result<Vec<u8>, String> {
         match folder.compression {
             0 => {
                 if raw.len() != cb_uncomp {
-                    return Err(format!("CFDATA {block}: stored size {} differs from declared {cb_uncomp}", raw.len()));
+                    return Err(format!(
+                        "CFDATA {block}: stored size {} differs from declared {cb_uncomp}",
+                        raw.len()
+                    ));
                 }
                 out.extend_from_slice(raw);
-            },
+            }
             1 => {
                 // MSZIP: each block is `CK` followed by a raw deflate stream.
                 let body = raw
@@ -218,7 +222,9 @@ fn decompress_folder(data: &[u8], folder: &Folder) -> Result<Vec<u8>, String> {
                     let produced = (inflater.total_out() - before_out) as usize;
                     chunk.truncate(produced);
                     if produced > cb_uncomp.saturating_sub(block_out.len()) {
-                        return Err(format!("CFDATA {block}: decompression exceeds declared {cb_uncomp} bytes"));
+                        return Err(format!(
+                            "CFDATA {block}: decompression exceeds declared {cb_uncomp} bytes"
+                        ));
                     }
                     block_out.extend_from_slice(&chunk);
                     consumed = inflater.total_in() as usize;
@@ -370,7 +376,6 @@ mod tests {
         assert_eq!(bytes.len(), payload.len());
         assert!(bytes.iter().all(|byte| *byte == b'A'));
     }
-
 
     #[test]
     fn malformed_file_table_offset_is_an_error_not_a_panic() {
