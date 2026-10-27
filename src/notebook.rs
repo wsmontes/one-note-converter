@@ -261,7 +261,9 @@ fn read_level(folder: &Path, toc: Option<&Path>, depth: usize) -> Notebook {
             entry.name.trim_end_matches(".one").to_string()
         };
         if output::safe_toc_name(&name).is_none() {
-            notebook.errors.push(format!("unsafe group name in TOC: {name:?}"));
+            notebook
+                .errors
+                .push(format!("unsafe group name in TOC: {name:?}"));
             continue;
         }
         let source = folder.join(&name);
@@ -384,7 +386,9 @@ fn write_level(
             }
             let stem = entry.name.trim_end_matches(".one");
             if !written_sections.insert(stem.to_lowercase()) {
-                stats.failures.push(format!("duplicate output section name: {stem:?}"));
+                stats
+                    .failures
+                    .push(format!("duplicate output section name: {stem:?}"));
                 continue;
             }
             let destination = if split_pages {
@@ -392,7 +396,10 @@ fn write_level(
             } else {
                 format!("{stem}.md")
             };
-            index.push_str(&format!("- [{stem}]({})\n", output::escape_link(&destination)));
+            index.push_str(&format!(
+                "- [{stem}]({})\n",
+                output::escape_link(&destination)
+            ));
             let input = folder.join(&entry.name);
             let assets = out.join(format!("{stem}_assets"));
             let section_output = out.join(format!("{stem}.md"));
@@ -507,7 +514,10 @@ fn write_level(
 /// Convert all sections in a CAB without a root table of contents, preserving
 /// subfolder structure. Shared by the CLI and Python surfaces.
 pub fn write_unindexed(
-    source: &Path, out: &Path, front_matter: bool, split_pages: bool,
+    source: &Path,
+    out: &Path,
+    front_matter: bool,
+    split_pages: bool,
 ) -> Result<TreeStats, String> {
     let mut stats = TreeStats::default();
     fn visit(
@@ -526,9 +536,13 @@ pub fn write_unindexed(
         entries.sort_by_key(|entry| entry.file_name());
         for entry in entries {
             let path = entry.path();
-            let ty = entry.file_type().map_err(|error| format!("{}: {error}", path.display()))?;
+            let ty = entry
+                .file_type()
+                .map_err(|error| format!("{}: {error}", path.display()))?;
             if ty.is_symlink() {
-                stats.failures.push(format!("symlink in extracted package: {}", path.display()));
+                stats
+                    .failures
+                    .push(format!("symlink in extracted package: {}", path.display()));
                 continue;
             }
             if ty.is_dir() {
@@ -538,11 +552,20 @@ pub fn write_unindexed(
             if !ty.is_file() || path.extension().is_none_or(|ext| ext != "one") {
                 continue;
             }
-            let relative = path.parent().unwrap_or(source).strip_prefix(source)
+            let relative = path
+                .parent()
+                .unwrap_or(source)
+                .strip_prefix(source)
                 .map_err(|error| format!("{}: {error}", path.display()))?;
-            let stem = path.file_stem().unwrap_or_default().to_string_lossy().to_string();
+            let stem = path
+                .file_stem()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string();
             if output::safe_toc_name(&stem).is_none() {
-                stats.failures.push(format!("unsafe section name: {stem:?}"));
+                stats
+                    .failures
+                    .push(format!("unsafe section name: {stem:?}"));
                 continue;
             }
             let target = out.join(relative).join(&stem);
@@ -551,26 +574,40 @@ pub fn write_unindexed(
                 stats.failures.push(format!("colliding section output: {}", target.display()));
                 continue;
             }
-            let bytes = std::fs::read(&path)
-                .map_err(|error| format!("{}: {error}", path.display()))?;
+            let bytes =
+                std::fs::read(&path).map_err(|error| format!("{}: {error}", path.display()))?;
             let result = Section::read(bytes).and_then(|section| {
                 if split_pages {
                     section.write_pages(&target, front_matter)
                 } else {
-                    section.write(&target.join(format!("{stem}.md")),
-                                  &target.join("assets"), front_matter)
+                    section.write(
+                        &target.join(format!("{stem}.md")),
+                        &target.join("assets"),
+                        front_matter,
+                    )
                 }
             });
             match result {
                 Ok(written) => {
                     stats.converted += 1;
-                    stats.failures.extend(written.failures.iter().map(|failure|
-                        format!("{}: {failure}", path.display())));
-                    stats.warnings.extend(written.warnings.iter().map(|warning|
-                        format!("{}: {warning}", path.display())));
+                    stats.failures.extend(
+                        written
+                            .failures
+                            .iter()
+                            .map(|failure| format!("{}: {failure}", path.display())),
+                    );
+                    stats.warnings.extend(
+                        written
+                            .warnings
+                            .iter()
+                            .map(|warning| format!("{}: {warning}", path.display())),
+                    );
                     stats.sections.push(SectionReport {
-                        input: path, pages: written.pages, assets: written.assets,
-                        failures: written.failures, warnings: written.warnings,
+                        input: path,
+                        pages: written.pages,
+                        assets: written.assets,
+                        failures: written.failures,
+                        warnings: written.warnings,
                     });
                 }
                 Err(error) => stats.failures.push(format!("{}: {error}", path.display())),
