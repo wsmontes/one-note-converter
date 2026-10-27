@@ -243,8 +243,8 @@ not depend on that project.
 
 `./scripts/check.sh` runs the same commands the CI workflow runs, in the same
 order: `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D
-warnings`, `cargo test --release -p one-note-converter`, `maturin develop` plus
-`pytest -q`, `maturin build --sdist` with `twine check`, installing that sdist
+warnings`, `cargo test --release -p one-note-converter`, `maturin build` and install of the
+wheel plus `pytest -q`, `maturin build --sdist` with `twine check`, installing that sdist
 into a clean venv, and `actionlint` when it is installed. It works on a bare
 checkout: without `python/.venv` it creates a throwaway one from
 `python/requirements-dev.txt`.

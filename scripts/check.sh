@@ -43,14 +43,15 @@ step "rust tests (CLI crate, as in CI)"
 cargo test --release -p one-note-converter
 
 step "python extension"
-(cd python && VIRTUAL_ENV="$VENV" "$VENV/bin/maturin" develop --release)
+rm -rf dist
+(cd python && "$VENV/bin/maturin" build --release --out ../dist)
+"$VENV/bin/pip" install --quiet --force-reinstall dist/*.whl
 
 step "python tests"
 (cd python && "$VENV/bin/python" -m pytest tests -q)
 
 step "packaging: wheel + sdist"
-rm -rf dist
-(cd python && VIRTUAL_ENV="$VENV" "$VENV/bin/maturin" build --release --sdist --out ../dist)
+(cd python && "$VENV/bin/maturin" build --release --sdist --out ../dist)
 
 step "packaging: metadata check"
 "$VENV/bin/twine" check dist/*
