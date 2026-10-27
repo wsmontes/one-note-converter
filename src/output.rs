@@ -509,6 +509,10 @@ pub fn safe_toc_name(name: &str) -> Option<&str> {
 mod safety_tests {
     use super::*;
 
+    fn fixture_store() -> store::Store {
+        store::Store::parse(include_bytes!("../tests/fixtures/testOneNote2016.one")).unwrap()
+    }
+
     #[test]
     fn rejects_unsafe_package_and_toc_names() {
         for name in [
@@ -570,7 +574,7 @@ mod safety_tests {
         });
         let section = Section {
             data: Vec::new(),
-            store: store::Store::parse(include_bytes!("../tests/fixtures/testOneNote2016.one")).unwrap(),
+            store: fixture_store(),
             pages: vec![a, b],
         };
         let scratch = crate::temp::ScratchDir::new("onenote-pages-test").unwrap();
@@ -605,7 +609,7 @@ mod safety_tests {
         }));
         let section = Section {
             data: Vec::new(),
-            store: store::Store::parse(include_bytes!("../tests/fixtures/testOneNote2016.one")).unwrap(),
+            store: fixture_store(),
             pages: vec![page],
         };
         let scratch = crate::temp::ScratchDir::new("onenote-missing-asset-test").unwrap();
