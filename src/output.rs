@@ -570,7 +570,7 @@ mod safety_tests {
         });
         let section = Section {
             data: Vec::new(),
-            store: store::Store::default(),
+            store: store::Store::parse(include_bytes!("../tests/fixtures/testOneNote2016.one")).unwrap(),
             pages: vec![a, b],
         };
         let scratch = crate::temp::ScratchDir::new("onenote-pages-test").unwrap();
@@ -605,7 +605,7 @@ mod safety_tests {
         }));
         let section = Section {
             data: Vec::new(),
-            store: store::Store::default(),
+            store: store::Store::parse(include_bytes!("../tests/fixtures/testOneNote2016.one")).unwrap(),
             pages: vec![page],
         };
         let scratch = crate::temp::ScratchDir::new("onenote-missing-asset-test").unwrap();
