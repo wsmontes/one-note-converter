@@ -223,8 +223,8 @@ def test_split_page_export_has_one_yaml_header_per_file(tmp_path: Path) -> None:
     assert len(pages) == result.pages
     for page in pages:
         text = page.read_text(encoding="utf-8")
-        assert text.startswith("---\\ntitle: ")
-        assert text.count("---\\n") == 2
+        assert text.startswith("---\ntitle: ")
+        assert text.count("---\n") == 2
 
 
 def test_nested_unindexed_package_keeps_folder_in_python(tmp_path: Path) -> None:
