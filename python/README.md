@@ -16,8 +16,8 @@ python -m venv .venv && . .venv/bin/activate
 pip install maturin
 maturin develop --release   # or: maturin build --release + pip install target/wheels/*.whl
 
-# a wheel for distribution (abi3: one wheel for CPython ≥ 3.8)
-maturin build --release      # → target/wheels/onenote-<ver>-cp38-abi3-<platform>.whl
+# a wheel for distribution (abi3: one wheel for CPython ≥ 3.9)
+maturin build --release      # → target/wheels/onenote-<ver>-cp39-abi3-<platform>.whl
 pip install target/wheels/onenote-*.whl
 ```
 
@@ -37,7 +37,11 @@ section.markdown(front_matter=True)                  # str, pictures as bare nam
 section.images()                                     # list[Image] with .filename/.data
 
 stats = section.write("out/Section.md", "out/img", front_matter=True)
-stats.pages, stats.assets, stats.failures
+stats.pages, stats.assets, stats.failures, stats.warnings
+
+# Standalone Markdown and valid YAML front matter for each page:
+pages = section.write_pages("out/pages", front_matter=True)
+# out/pages/index.md + one .md per page + assets/
 ```
 
 `Image.data` is `bytes`. Names are unique and deduplicated per section **and are
@@ -66,6 +70,7 @@ notebook.errors            # entries whose file/folder is missing
 notebook.all_sections()    # every section, depth first
 
 stats = notebook.write("out/notebook", front_matter=True)
+# Optionally: notebook.write("out/notebook-pages", front_matter=True, split_pages=True)
 # out/notebook/<Section>.md + <Section>_assets/, one index.md per level
 ```
 
@@ -79,6 +84,7 @@ package.entries            # file names inside the cabinet
 package.sections()         # parse every .one entry
 package.extract_to("dir")  # write the entries and return their paths
 stats = package.write("out/package", front_matter=True)
+# Optionally: package.write("out/package-pages", front_matter=True, split_pages=True)
 ```
 
 `Package.write` follows the CLI: when the cabinet carries a table of contents it
@@ -88,8 +94,10 @@ converts a notebook tree, otherwise each section on its own. MSZIP and stored
 ## Errors
 
 Malformed files raise `ValueError` with the parser's message; unreadable paths
-raise `OSError`. `write` never raises for a missing picture link — it reports the
-paths in `stats.failures` and still writes the Markdown.
+raise `OSError`. A referenced picture or attachment without embedded bytes appears
+in `stats.warnings`; failures writing assets are in `stats.failures`. Both are
+available on section, notebook and package conversion statistics. In the default
+combined-section output, use split-pages mode to preserve metadata for every page.
 
 ## Tests
 
