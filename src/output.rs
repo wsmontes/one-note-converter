@@ -453,3 +453,46 @@ pub fn safe_toc_name(name: &str) -> Option<&str> {
         Some(name)
     }
 }
+
+
+#[cfg(test)]
+mod safety_tests {
+    use super::*;
+
+    #[test]
+    fn rejects_unsafe_package_and_toc_names() {
+        for name in ["/etc/secret.one", "../secret.one", "a/../secret.one",
+                     "C:\\temp\\secret.one", "sub/../../secret.one"] {
+            assert!(package_path(name).is_none(), "{name}");
+        }
+        assert_eq!(package_path("notes/Section.one"), Some(PathBuf::from("notes/Section.one")));
+        for name in ["../escape.one", "/absolute.one", "C:\\escape.one",
+                     "sub/section.one", "..", "bad?.one"] {
+            assert!(safe_toc_name(name).is_none(), "{name}");
+        }
+        assert_eq!(safe_toc_name("Nova Seção 1.one"), Some("Nova Seção 1.one"));
+    }
+
+    #[test]
+    fn sibling_asset_links_are_relative_and_uri_safe() {
+        let relative = relative_link_prefix(Path::new("export/pages"), Path::new("export/assets"));
+        assert_eq!(relative, "../assets");
+        assert_eq!(join_link(&relative, "A#? 100% (1).png"),
+                   "../assets/A%23%3F%20100%25%20%281%29.png");
+        assert_eq!(escape_link("Nova Seção 1.md"), "Nova%20Seção%201.md");
+    }
+
+    #[test]
+    fn missing_payload_is_reported_during_materialization() {
+        let mut page = Page { title: "Pictures".into(), ..Page::default() };
+        page.blocks.push(doc::Block::Image(AssetRef {
+            filename: "not-embedded.png".into(), ..AssetRef::default()
+        }));
+        let section = Section { data: Vec::new(), store: store::Store::default(), pages: vec![page] };
+        let scratch = crate::temp::ScratchDir::new("onenote-missing-asset-test").unwrap();
+        let (markdown, stats) = section.materialize(scratch.path(), "", false).unwrap();
+        assert!(markdown.contains("not-embedded.png"));
+        assert!(stats.warnings.iter().any(|w| w.contains("not-embedded.png")));
+        assert_eq!(stats.assets, 0);
+    }
+}
