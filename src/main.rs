@@ -901,7 +901,6 @@ fn notebook_into(
             assets: section.assets,
             failures: section.failures.clone(),
             warnings: section.warnings.clone(),
-            ..ReportEntry::default()
         });
     }
     if stats.converted == 0 && stats.failures.is_empty() {
