@@ -146,7 +146,9 @@ impl Section {
             warnings.push(format!("asset {name:?} has no embedded payload"));
         }
         if self.store.header.kind() == crate::header::ContainerKind::PackageStore {
-            warnings.push("[MS-FSSHTTPB] support is experimental; page bodies may be incomplete".into());
+            warnings.push(
+                "[MS-FSSHTTPB] support is experimental; page bodies may be incomplete".into(),
+            );
         }
         let mut assets_written = 0usize;
         for image in &images {
@@ -308,7 +310,13 @@ pub fn unique_name(filename: &str, written: &mut BTreeSet<String>) -> String {
         .next()
         .unwrap_or("image")
         .chars()
-        .map(|c| if c.is_control() || "<>:\"|?*".contains(c) { '_' } else { c })
+        .map(|c| {
+            if c.is_control() || "<>:\"|?*".contains(c) {
+                '_'
+            } else {
+                c
+            }
+        })
         .collect();
     let sanitized = sanitized.trim_end_matches(['.', ' ']);
     let sanitized = if sanitized.is_empty() || sanitized == "." || sanitized == ".." {
@@ -365,7 +373,9 @@ pub fn relative_link_prefix(base: &Path, assets: &Path) -> String {
         for component in absolute.components() {
             match component {
                 Component::CurDir => {}
-                Component::ParentDir => { result.pop(); }
+                Component::ParentDir => {
+                    result.pop();
+                }
                 other => result.push(other.as_os_str()),
             }
         }
@@ -381,7 +391,11 @@ pub fn relative_link_prefix(base: &Path, assets: &Path) -> String {
         return assets.to_string_lossy().replace('\\', "/");
     }
     let mut parts = vec!["..".to_string(); from.len() - common];
-    parts.extend(to[common..].iter().map(|part| part.as_os_str().to_string_lossy().to_string()));
+    parts.extend(
+        to[common..]
+            .iter()
+            .map(|part| part.as_os_str().to_string_lossy().to_string()),
+    );
     parts.join("/")
 }
 
@@ -469,20 +483,33 @@ pub fn safe_toc_name(name: &str) -> Option<&str> {
     }
 }
 
-
 #[cfg(test)]
 mod safety_tests {
     use super::*;
 
     #[test]
     fn rejects_unsafe_package_and_toc_names() {
-        for name in ["/etc/secret.one", "../secret.one", "a/../secret.one",
-                     "C:\\temp\\secret.one", "sub/../../secret.one"] {
+        for name in [
+            "/etc/secret.one",
+            "../secret.one",
+            "a/../secret.one",
+            "C:\\temp\\secret.one",
+            "sub/../../secret.one",
+        ] {
             assert!(package_path(name).is_none(), "{name}");
         }
-        assert_eq!(package_path("notes/Section.one"), Some(PathBuf::from("notes/Section.one")));
-        for name in ["../escape.one", "/absolute.one", "C:\\escape.one",
-                     "sub/section.one", "..", "bad?.one"] {
+        assert_eq!(
+            package_path("notes/Section.one"),
+            Some(PathBuf::from("notes/Section.one"))
+        );
+        for name in [
+            "../escape.one",
+            "/absolute.one",
+            "C:\\escape.one",
+            "sub/section.one",
+            "..",
+            "bad?.one",
+        ] {
             assert!(safe_toc_name(name).is_none(), "{name}");
         }
         assert_eq!(safe_toc_name("Nova Seção 1.one"), Some("Nova Seção 1.one"));
@@ -492,8 +519,10 @@ mod safety_tests {
     fn sibling_asset_links_are_relative_and_uri_safe() {
         let relative = relative_link_prefix(Path::new("export/pages"), Path::new("export/assets"));
         assert_eq!(relative, "../assets");
-        assert_eq!(join_link(&relative, "A#? 100% (1).png"),
-                   "../assets/A%23%3F%20100%25%20%281%29.png");
+        assert_eq!(
+            join_link(&relative, "A#? 100% (1).png"),
+            "../assets/A%23%3F%20100%25%20%281%29.png"
+        );
         assert_eq!(escape_link("Nova Seção 1.md"), "Nova%20Seção%201.md");
     }
 
@@ -523,15 +552,26 @@ mod safety_tests {
 
     #[test]
     fn missing_payload_is_reported_during_materialization() {
-        let mut page = Page { title: "Pictures".into(), ..Page::default() };
+        let mut page = Page {
+            title: "Pictures".into(),
+            ..Page::default()
+        };
         page.blocks.push(doc::Block::Image(AssetRef {
-            filename: "not-embedded.png".into(), ..AssetRef::default()
+            filename: "not-embedded.png".into(),
+            ..AssetRef::default()
         }));
-        let section = Section { data: Vec::new(), store: store::Store::default(), pages: vec![page] };
+        let section = Section {
+            data: Vec::new(),
+            store: store::Store::default(),
+            pages: vec![page],
+        };
         let scratch = crate::temp::ScratchDir::new("onenote-missing-asset-test").unwrap();
         let (markdown, stats) = section.materialize(scratch.path(), "", false).unwrap();
         assert!(markdown.contains("not-embedded.png"));
-        assert!(stats.warnings.iter().any(|w| w.contains("not-embedded.png")));
+        assert!(stats
+            .warnings
+            .iter()
+            .any(|w| w.contains("not-embedded.png")));
         assert_eq!(stats.assets, 0);
     }
 }
