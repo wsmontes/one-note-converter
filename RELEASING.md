@@ -9,7 +9,12 @@ the version bump and the tag.
 > before any step, so no workflow change helps), then re-run the workflow with
 > `gh run rerun <id>`. Meanwhile use `./scripts/check.sh`, which runs exactly
 > the CI commands in order (and works without a pre-existing virtualenv). Runner labels are pinned (`ubuntu-24.04`, `macos-15`,
-> `macos-15-intel`, `windows-2025`) so migrations do not change the matrix. Until that is resolved, CI does not run and neither does
+> `macos-15-intel`, `windows-2025`) so migrations do not change the matrix.
+> The workflows are **disabled** (`gh workflow disable CI`) so pushes do not
+> queue runs that can only fail; re-enable with `gh workflow enable CI` once the
+> account is unlocked, then re-run the existing run instead of triggering a new
+> one. Build outputs (`dist/`) are gitignored — the release assets are the
+> distributable artifacts. Until that is resolved, CI does not run and neither does
 > trusted publishing (OIDC) to PyPI. The working distribution path today is
 > Homebrew (tap + local build) and the artifacts attached to the GitHub release.
 > The two local upload commands at the end of sections 2 and 3 are the
