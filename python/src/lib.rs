@@ -245,8 +245,12 @@ impl PySection {
     #[pyo3(signature = (out, front_matter = false))]
     fn write_pages(&self, out: PathBuf, front_matter: bool) -> PyResult<PySectionStats> {
         let stats = self.inner.write_pages(&out, front_matter).map_err(error)?;
-        Ok(PySectionStats { pages: stats.pages, assets: stats.assets,
-                            failures: stats.failures, warnings: stats.warnings })
+        Ok(PySectionStats {
+            pages: stats.pages,
+            assets: stats.assets,
+            failures: stats.failures,
+            warnings: stats.warnings,
+        })
     }
 
     fn __repr__(&self) -> String {
@@ -399,8 +403,14 @@ impl PyNotebook {
         let Some(toc) = self.inner.toc.clone() else {
             return Err(error("notebook has no table of contents".to_string()));
         };
-        let stats = notebook::write_tree_with_options(&self.inner.folder, &out, front_matter, Some(&toc), split_pages)
-            .map_err(error)?;
+        let stats = notebook::write_tree_with_options(
+            &self.inner.folder,
+            &out,
+            front_matter,
+            Some(&toc),
+            split_pages,
+        )
+        .map_err(error)?;
         Ok(PyTreeStats {
             converted: stats.converted,
             sections: stats.sections.into_iter().map(section_report).collect(),
@@ -427,10 +437,16 @@ struct PyPackage {
 }
 
 impl PyPackage {
-    fn write_sections(&self, out: &std::path::Path, front_matter: bool, split_pages: bool) -> PyResult<PyTreeStats> {
+    fn write_sections(
+        &self,
+        out: &std::path::Path,
+        front_matter: bool,
+        split_pages: bool,
+    ) -> PyResult<PyTreeStats> {
         let scratch = one_note_converter::temp::ScratchDir::new("onenote-py-pkg").map_err(error)?;
         self.extract_to(scratch.path().to_path_buf())?;
-        let stats = notebook::write_unindexed(scratch.path(), out, front_matter, split_pages).map_err(error)?;
+        let stats = notebook::write_unindexed(scratch.path(), out, front_matter, split_pages)
+            .map_err(error)?;
         Ok(PyTreeStats {
             converted: stats.converted,
             sections: stats.sections.into_iter().map(section_report).collect(),
@@ -511,7 +527,13 @@ impl PyPackage {
                     .file_stem()
                     .map(|stem| stem.to_string_lossy().to_string())
                     .unwrap_or_else(|| "notebook".to_string());
-                match notebook::write_tree_with_options(&base, &out.join(stem), front_matter, Some(&toc), split_pages) {
+                match notebook::write_tree_with_options(
+                    &base,
+                    &out.join(stem),
+                    front_matter,
+                    Some(&toc),
+                    split_pages,
+                ) {
                     Ok(stats) => {
                         combined.converted += stats.converted;
                         combined.failures.extend(stats.failures);
