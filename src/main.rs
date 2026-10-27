@@ -880,6 +880,7 @@ fn notebook_into(
             pages: section.pages,
             assets: section.assets,
             failures: section.failures.clone(),
+            warnings: section.warnings.clone(),
             ..ReportEntry::default()
         });
     }
@@ -990,6 +991,8 @@ fn onepkg(
                             kind: "package-section",
                             pages: stats.pages,
                             assets: stats.assets,
+                            warnings: stats.warnings.clone(),
+                            failures: stats.failures.clone(),
                             ..ReportEntry::default()
                         });
                     }
@@ -1072,13 +1075,7 @@ fn convert(
     let prefix = one_note_converter::output::relative_link_prefix(&base_dir, &assets_dir);
 
     let (markdown, stats) = section.materialize(&assets_dir, &prefix, options.front_matter)?;
-    let mut warnings: Vec<String> = section.store().warnings.clone();
-    if kind == "package" {
-        warnings.push(
-            "[MS-FSSHTTPB] package store support is experimental — page bodies may be incomplete"
-                .to_string(),
-        );
-    }
+    let warnings = stats.warnings.clone();
     report.add(ReportEntry {
         path: input.display().to_string(),
         kind,
