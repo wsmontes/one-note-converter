@@ -38,8 +38,8 @@ pip install -r requirements-dev.txt && maturin develop --release
 # plus a portable sdist that builds anywhere Rust is available)
 pip install https://github.com/wsmontes/one-note-converter/releases/download/v0.1.2/onenote_converter-0.1.2.tar.gz
 
-# crates.io is not published yet; once it is:
-# cargo install one-note-converter
+# CLI from crates.io (same binary, built by cargo)
+cargo install one-note-converter
 ```
 
 ## Usage

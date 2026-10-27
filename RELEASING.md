@@ -10,41 +10,33 @@ the version bump and the tag.
 > licence text — and attached them to the GitHub release. The Homebrew tap
 > auto-bumped to `0.1.2` through its own workflow, and its daily schedule is on.
 >
-> **PyPI is live.** `pip install onenote-converter` resolves 0.1.2 from the
-> index; the trusted publisher is registered on
-> <https://pypi.org/manage/account/publishing/> (project `onenote-converter`,
-> owner `wsmontes`, repository `one-note-converter`, workflow `release.yml`,
-> environment `pypi`) and the repository variable `PYPI_PUBLISH=true` is set.
-> The workflow name and environment must match those exact values — a pending
-> publisher saved with another workflow filename fails as `invalid-publisher`.
+> **All three channels are live (v0.1.2):** PyPI
+> (<https://pypi.org/project/onenote-converter/>, OIDC — no token), crates.io
+> (<https://crates.io/crates/one-note-converter>) and Homebrew
+> (`brew install wsmontes/onenote/onenote2md`).
 >
-> Because `PYPI_PUBLISH=true`, **every tag now publishes to PyPI
-> automatically** (OIDC, no token) — that is the intended behaviour.
+> Publishes from CI: PyPI runs automatically on every tag because
+> `PYPI_PUBLISH=true`. crates.io still needs the `CARGO_REGISTRY_TOKEN` secret —
+> it is **not** set, so v0.1.2 was published once from a workstation with
+> `cargo publish -p one-note-converter --locked` after `cargo login`. Set the
+> secret (with a token you did not paste anywhere else) to make tags publish too.
 >
-> Two consequences to keep in mind:
+> Two rules that bite:
 >
-> - A published version is immutable on PyPI (and on crates.io). Re-running
+> - A published version is immutable on PyPI and crates.io. Re-running
 >   `gh workflow run release.yml --ref v0.1.2` for an already published version
->   fails with *File already exists*: `pypa/gh-action-pypi-publish` defaults
->   `skip-existing` to `false`. Fix something by bumping the version and tagging
->   again; only if you truly must re-drive the same version add
+>   fails with *File already exists* (`pypa/gh-action-pypi-publish` defaults
+>   `skip-existing` to `false`). Fix things by bumping the version and tagging
+>   again; only if you must re-drive the same version add
 >   `with: skip-existing: true` to that step.
-> - The `github-release` job re-uploads the same assets with `--clobber`, which is
->   harmless.
+> - `cargo login` expects the **secret** (`cio…`), not the token's display name.
+>   Pasting the name stores a bogus value and every publish fails with
+>   `401 … unexpected authentication scheme`. If that happens, delete the `token`
+>   line from `~/.cargo/credentials.toml` and log in again.
 >
-> Left: crates.io. No token is configured anywhere (`gh secret list` is empty and
-> `~/.cargo/credentials` does not exist), so the publish job is skipped. Two ways:
->
-> ```sh
-> # from CI, on a tag
-> gh secret set CARGO_REGISTRY_TOKEN
->
-> # or once, locally
-> cargo login            # stores ~/.cargo/credentials
-> cargo publish -p one-note-converter --locked
-> ```
->
-> Build outputs (`dist/`) are gitignored — release assets are the distributables.
+> The `github-release` job re-uploads the same assets with `--clobber`, which is
+> harmless. Build outputs (`dist/`) are gitignored — release assets are the
+> distributables.
 
 ## 1. Version bump
 
