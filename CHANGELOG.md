@@ -6,6 +6,14 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-10-27
+
+### Fixed
+
+- Wheels now carry the license text (`dist-info/licenses/LICENSE.python`), as the
+  MIT terms require; `scripts/check.sh` and CI fail if the copy drifts from the
+  repository `LICENSE`.
+
 ## [0.1.1] - 2026-10-27
 
 Packaging and verification release; no parser behaviour changed.
@@ -59,6 +67,7 @@ First release: a CLI, a Rust library and Python bindings over one parser.
 - Encrypted sections are detected and reported; their content is not decrypted.
 - Format decisions and the measurements behind them are recorded in `PLAN.md`.
 
-[Unreleased]: https://github.com/wsmontes/one-note-converter/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/wsmontes/one-note-converter/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/wsmontes/one-note-converter/releases/tag/v0.1.2
 [0.1.1]: https://github.com/wsmontes/one-note-converter/releases/tag/v0.1.1
 [0.1.0]: https://github.com/wsmontes/one-note-converter/releases/tag/v0.1.0

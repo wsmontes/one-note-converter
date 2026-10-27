@@ -33,6 +33,9 @@ fi
 # Absolute, so the python/ subshell below cannot mis-resolve it.
 VENV="$(cd "$VENV" && pwd)"
 
+step "license copies match"
+cmp -s LICENSE python/LICENSE.python
+
 step "cargo fmt"
 cargo fmt --all --check
 

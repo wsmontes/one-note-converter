@@ -8,6 +8,9 @@ description = "Read Microsoft OneNote .one sections, .onetoc2 notebooks and .one
 readme = "README.md"
 requires-python = ">=3.9"
 license = "MIT"
+# Named `LICENSE.python` so it does not collide with the workspace LICENSE that
+# maturin also puts at the sdist root; PEP 639 accepts any `LICENSE*` name.
+license-files = ["LICENSE.python"]
 authors = [{ name = "Wagner Montes", email = "wmontes@gmail.com" }]
 keywords = ["onenote", "markdown", "ms-onestore", "converter", "notebook"]
 classifiers = [

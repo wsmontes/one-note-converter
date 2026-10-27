@@ -54,7 +54,9 @@ jobs:
       - name: Build and install the extension
         working-directory: python
         run: |
+          cmp -s ../LICENSE LICENSE.python
           python -m pip install --upgrade pip maturin pytest
+          rm -rf dist
           maturin build --release --out dist
           python -m pip install dist/*.whl
       - name: Test
