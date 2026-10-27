@@ -250,3 +250,35 @@ fn markdown_links_name_the_images_the_caller_gets() {
         );
     }
 }
+
+#[test]
+fn nested_package_without_toc_preserves_section_folder() {
+    let section = std::fs::read("tests/fixtures/testOneNote2016.one").unwrap();
+    let package = cabinet(&[("Group/Nested.one", &section)]);
+    let scratch = one_note_converter::temp::ScratchDir::new("onenote-nested-test").unwrap();
+    let package_path = scratch.path().join("nested.onepkg");
+    std::fs::write(&package_path, package).unwrap();
+    let out = scratch.path().join("export");
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_onenote2md"))
+        .args(["onepkg"])
+        .arg(&package_path)
+        .arg("-o").arg(&out).output().unwrap();
+    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+    assert!(out.join("Group/Nested/Nested.md").is_file());
+}
+
+#[test]
+fn split_pages_produces_a_page_document_and_index() {
+    let scratch = one_note_converter::temp::ScratchDir::new("onenote-pages-cli-test").unwrap();
+    let output = scratch.path().join("pages");
+    let result = std::process::Command::new(env!("CARGO_BIN_EXE_onenote2md"))
+        .args(["convert", "tests/fixtures/testOneNote2016.one", "--split-pages", "--front-matter"])
+        .arg("-o").arg(&output).output().unwrap();
+    assert!(result.status.success(), "{}", String::from_utf8_lossy(&result.stderr));
+    assert!(output.join("index.md").exists());
+    let md = std::fs::read_dir(&output).unwrap()
+        .filter_map(Result::ok).map(|entry| entry.path())
+        .find(|path| path.extension().is_some_and(|ext| ext == "md")
+              && path.file_name().is_some_and(|name| name != "index.md")).unwrap();
+    assert!(std::fs::read_to_string(md).unwrap().starts_with("---\ntitle:"));
+}
